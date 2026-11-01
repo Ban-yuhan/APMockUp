@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APCenter 배치 시뮬레이터</title>
+<link rel="stylesheet" href="css/editor.css">
+</head>
+<body>
+  <header id="topbar"></header>
+  <aside id="left"></aside>
+  <main id="stage"><canvas id="cv"></canvas><div id="toasts"></div></main>
+  <aside id="right"><div id="inspector"></div></aside>
+  <footer id="bottombar"></footer>
+  <div id="issues" class="hidden"></div>
+  <div id="modal" class="hidden"></div>
+  <input type="file" id="file" accept=".json,.js" hidden>
+
+  <script src="js/config.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="layout-data.js"></script>
+  <script src="js/editor/editor.js"></script>
+  <script src="js/editor/view.js"></script>
+  <script src="js/editor/panels.js"></script>
+  <script src="js/editor/selftest.js"></script>
+  <script>
+    Ed.init();
+    if (/[?&]test/.test(location.search)) EdTest.run();
+    const demo = location.search.match(/[?&]demo=(\w+)/);   // 화면 확인용: 벨트 모드 + 1번 라인 선택
+    if (demo) { Ed.replace(LayoutLib.makeDefault()); Ed.setMode('belt:' + demo[1]); Ed.select({ t: 'line', st: demo[1], id: 1 }); }
+  </script>
+</body>
+</html>

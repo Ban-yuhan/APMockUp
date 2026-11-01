@@ -1,0 +1,63 @@
+// 상차 미니게임 상태 명령 (원본 loading-ui.js의 open/close/place/remove/resetAll/depart)
+// 화면(LoadingView)은 드래그만 맡고, 상태를 바꾸는 일은 모두 여기로 보낸다
+using System.Collections.Generic;
+using static APC.Game;
+
+namespace APC
+{
+    public static class Loading
+    {
+        // 열려 있는 도크 (null = 닫힘)
+        public static Dock dock;
+        public static OutTruck Truck => dock?.truck;
+
+        public static bool Open(Dock d)
+        {
+            if (!Docks.CanOpen(d)) { Notify("", "지금은 상차 패널을 열 수 없습니다"); return false; }
+            dock = d;
+            G.paused = true;
+            return true;
+        }
+
+        public static void Close()
+        {
+            if (dock == null) return;
+            var tr = dock.truck;
+            if (tr != null && tr.mode == "manual" && tr.placements.Count == 0) tr.mode = null;
+            dock = null;
+            G.paused = false;
+        }
+
+        // placement가 있으면 실린 박스를 옮기고, 없으면 대기 박스를 새로 싣는다
+        public static void Place(Box box, List<UnityEngine.Vector2Int> cells, Placement placement)
+        {
+            var tr = Truck;
+            if (placement != null) placement.cells = cells;
+            else
+            {
+                if (!dock.waiting.Remove(box)) return;
+                tr.placements.Add(new Placement { box = box, cells = cells });
+            }
+            tr.mode = "manual";
+        }
+
+        public static void Remove(Placement p)
+        {
+            Truck.placements.Remove(p);
+            dock.waiting.Add(p.box);
+        }
+
+        public static void ResetAll()
+        {
+            var tr = Truck;
+            foreach (var p in tr.placements) dock.waiting.Add(p.box);
+            tr.placements.Clear();
+        }
+
+        public static void Depart()
+        {
+            if (Truck.placements.Count == 0) return;
+            Docks.Depart(dock);
+        }
+    }
+}

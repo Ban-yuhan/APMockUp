@@ -1,0 +1,435 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d5f8669d620b7d40ad10117b235a8cf, type: 3}
+  m_Name: ApcConfig
+  m_EditorClassIdentifier: APC.Runtime::APC.ApcConfig
+  startMoney: 500
+  phaseSeconds: 600
+  dayStartHour: 6
+  player:
+    speed: 7
+    capacity: 4
+  interactRadius: 1.6
+  interactDelay: 0.2
+  timing:
+    handle: 0.25
+    inspect: 1
+    pack: 1
+    loadBox: 1.2
+  debug:
+    moneyStep: 1000
+  inbound:
+    returnDelay: 8
+    retryDelay: 2
+    minItems: 12
+    maxItems: 20
+  facility:
+    parking:
+      name: "\uD558\uCC28 \uC8FC\uCC28\uACF5\uAC04"
+      emoji: "\U0001F17F\uFE0F"
+      unit: "\uB300"
+      desc: "\uB3D9\uC2DC\uC5D0 \uB4E4\uC5B4\uC62C \uC218 \uC788\uB294 \uC785\uACE0
+        \uD2B8\uB7ED"
+      values: 010000000200000003000000
+      costs: 000000009001000084030000
+    staging:
+      name: "\uD558\uCC28\uC7A5 \uD06C\uAE30"
+      emoji: "\U0001F4E5"
+      unit: "\uCE78"
+      desc: "\uD558\uCC28\uC7A5(\uC784\uC2DC \uBCF4\uAD00\uC18C) \uCD5C\uB300 \uBCF4\uAD00\uB7C9"
+      values: 1e0000002d0000003c00000050000000
+      costs: 00000000c800000090010000bc020000
+    bin:
+      name: "\uBCF4\uAD00\uD568 \uCD5C\uB300 \uBCF4\uAD00\uB7C9"
+      emoji: "\U0001F5C4\uFE0F"
+      unit: "\uAC1C"
+      desc: "\uBAA8\uB4E0 \uBCF4\uAD00\uD568\uC758 \uD488\uBAA9\uB2F9 \uCD5C\uB300
+        \uBCF4\uAD00\uB7C9"
+      values: 140000001e000000280000003700000046000000
+      costs: 000000002c01000058020000e8030000dc050000
+  breakChance:
+    inspect: 0.05
+    carry: 0.05
+  orders:
+    interval: 25
+    firstDelay: 2
+    maxUnits: 5
+    maxKinds: 3
+    baseReward: 10
+    priceMult: 2
+  evt:
+    name: "\uBA85\uC808 \uBB3C\uB958 \uD3ED\uC8FC!"
+    chance: 0.35
+    rushOrders: 10
+    intervalMult: 0.5
+  types:
+  - id: food
+    name: "\uC2DD\uD488"
+    emoji: "\U0001F371"
+    color: {r: 0.9019608, g: 0.49411765, b: 0.13333334, a: 1}
+  - id: daily
+    name: "\uC0DD\uD544\uD488"
+    emoji: "\U0001F9FC"
+    color: {r: 0.20392157, g: 0.59607846, b: 0.85882354, a: 1}
+  - id: cloth
+    name: "\uC758\uB958"
+    emoji: "\U0001F45A"
+    color: {r: 0.60784316, g: 0.34901962, b: 0.7137255, a: 1}
+  - id: elec
+    name: "\uAC00\uC804"
+    emoji: "\U0001F50C"
+    color: {r: 0.3764706, g: 0.49019608, b: 0.54509807, a: 1}
+  - id: book
+    name: "\uB3C4\uC11C"
+    emoji: "\U0001F4DA"
+    color: {r: 0.15294118, g: 0.68235296, b: 0.3764706, a: 1}
+  items:
+  - id: ramen
+    name: "\uB77C\uBA74"
+    emoji: "\U0001F35C"
+    type: food
+    price: 8
+    cost: 0
+  - id: tissue
+    name: "\uD734\uC9C0"
+    emoji: "\U0001F9FB"
+    type: daily
+    price: 6
+    cost: 0
+  - id: water
+    name: "\uC0DD\uC218"
+    emoji: "\U0001F4A7"
+    type: food
+    price: 5
+    cost: 0
+  - id: shampoo
+    name: "\uC0F4\uD478"
+    emoji: "\U0001F9F4"
+    type: daily
+    price: 10
+    cost: 200
+  - id: tshirt
+    name: "\uD2F0\uC154\uCE20"
+    emoji: "\U0001F455"
+    type: cloth
+    price: 14
+    cost: 300
+  - id: socks
+    name: "\uC591\uB9D0"
+    emoji: "\U0001F9E6"
+    type: cloth
+    price: 7
+    cost: 300
+  - id: novel
+    name: "\uC18C\uC124\uCC45"
+    emoji: "\U0001F4D5"
+    type: book
+    price: 12
+    cost: 400
+  - id: earbuds
+    name: "\uC774\uC5B4\uD3F0"
+    emoji: "\U0001F3A7"
+    type: elec
+    price: 25
+    cost: 500
+  destinations:
+  - id: seoul
+    name: "\uC11C\uC6B8"
+    color: {r: 0.7529412, g: 0.22352941, b: 0.16862746, a: 1}
+    cost: 0
+  - id: incheon
+    name: "\uC778\uCC9C"
+    color: {r: 0.16078432, g: 0.5019608, b: 0.7254902, a: 1}
+    cost: 400
+  - id: daegu
+    name: "\uB300\uAD6C"
+    color: {r: 0.08627451, g: 0.627451, b: 0.52156866, a: 1}
+    cost: 700
+  - id: busan
+    name: "\uBD80\uC0B0"
+    color: {r: 0.5568628, g: 0.26666668, b: 0.6784314, a: 1}
+    cost: 1000
+  packTableCosts: 000000002c01000058020000
+  stages:
+  - id: unload
+    name: "\uD558\uCC28"
+    emoji: "\U0001F69A"
+    costs: 00000000960000002c010000
+  - id: sort
+    name: "\uBD84\uB958"
+    emoji: "\U0001F5C2\uFE0F"
+    costs: 00000000960000002c01000020030000
+  - id: inspect
+    name: "\uAC80\uC218"
+    emoji: "\U0001F50D"
+    costs: 00000000960000002c01000020030000
+  - id: transfer
+    name: "\uC774\uC1A1"
+    emoji: "\U0001F6D2"
+    costs: 00000000c800000090010000e8030000
+  - id: pack
+    name: "\uD3EC\uC7A5"
+    emoji: "\U0001F381"
+    costs: 00000000c800000090010000e8030000
+  - id: outbound
+    name: "\uCD9C\uACE0\uBD84\uB958"
+    emoji: "\U0001F4E4"
+    costs: 00000000c800000090010000e8030000
+  - id: load
+    name: "\uC0C1\uCC28"
+    emoji: "\U0001F69B"
+    costs: 00000000fa000000f4010000b0040000
+  care:
+    tierNames:
+    - "\uB0A1\uC740"
+    - "\uD3C9\uBC94\uD55C"
+    - "\uACE0\uAE09"
+    - "\uCD5C\uACE0\uAE09"
+    rest:
+      costs: 000000002c010000bc020000dc050000
+      recover:
+      - 4
+      - 7
+      - 11
+      - 16
+      until:
+      - 20
+      - 25
+      - 30
+      - 35
+      minRest: 3
+    purifier:
+      costs: 2c0100002c010000bc020000dc050000
+      chance:
+      - 0.1
+      - 0.2
+      - 0.3
+      - 0.45
+  alba:
+    max: 12
+    candidates: 3
+    rerollCost: 30
+    statMin: 1
+    statMax: 5
+    wageBase: 2
+    wagePerStat: 0.5
+    wageJitter: 2
+    hoursPerPhase: 12
+    unpaidMtMult: 2
+    fleeStep: 0.1
+  mt:
+    min: -100
+    max: 100
+    start: 50
+    perWork: 2
+    effect:
+    - min: 50
+      mult: 1.15
+    - min: 0
+      mult: 1
+    - min: -50
+      mult: 0.85
+    - min: -Infinity
+      mult: 0.7
+    restChance:
+    - min: 20
+      p: 0.005
+    - min: 0
+      p: 0.03
+    - min: -50
+      p: 0.5
+    - min: -Infinity
+      p: 0.6
+  snacks:
+  - id: candy
+    emoji: "\U0001F36C"
+    name: "\uC0AC\uD0D5"
+    mt: 10
+  - id: choco
+    emoji: "\U0001F36B"
+    name: "\uCD08\uCF5C\uB9BF"
+    mt: 20
+  - id: lunch
+    emoji: "\U0001F371"
+    name: "\uB3C4\uC2DC\uB77D"
+    mt: 40
+  automation:
+    sortInterval: 0.6
+    inspectTime: 1
+    transferInterval: 0.5
+    packTime: 1.5
+    outboundInterval: 0.8
+    loadInterval: 1
+    loadTarget: 0.9
+    flySpeed: 7
+  loading:
+    truckReturnDelay: 10
+    truckTypes:
+    - id: small
+      name: "\uC18C\uD615"
+      w: 5
+      h: 4
+      locked: 0100000003000000
+      weight: 4
+    - id: mid
+      name: "\uC911\uD615"
+      w: 5
+      h: 5
+      locked: 0200000004000000
+      weight: 4
+    - id: large
+      name: "\uB300\uD615"
+      w: 6
+      h: 5
+      locked: 0200000005000000
+      weight: 2
+    shapes:
+    - units: 1
+      list:
+      - name: "\u25A0"
+        cells:
+        - {x: 0, y: 0}
+    - units: 2
+      list:
+      - name: '-'
+        cells:
+        - {x: 0, y: 0}
+        - {x: 1, y: 0}
+    - units: 3
+      list:
+      - name: '-'
+        cells:
+        - {x: 0, y: 0}
+        - {x: 1, y: 0}
+        - {x: 2, y: 0}
+      - name: "\u3131"
+        cells:
+        - {x: 0, y: 0}
+        - {x: 1, y: 0}
+        - {x: 1, y: 1}
+      - name: "\u3134"
+        cells:
+        - {x: 0, y: 0}
+        - {x: 0, y: 1}
+        - {x: 1, y: 1}
+    - units: 4
+      list:
+      - name: '-'
+        cells:
+        - {x: 0, y: 0}
+        - {x: 1, y: 0}
+        - {x: 2, y: 0}
+        - {x: 3, y: 0}
+      - name: "\u3131"
+        cells:
+        - {x: 0, y: 0}
+        - {x: 1, y: 0}
+        - {x: 2, y: 0}
+        - {x: 2, y: 1}
+      - name: "\u3134"
+        cells:
+        - {x: 0, y: 0}
+        - {x: 0, y: 1}
+        - {x: 1, y: 1}
+        - {x: 2, y: 1}
+      - name: "\u3157"
+        cells:
+        - {x: 1, y: 0}
+        - {x: 0, y: 1}
+        - {x: 1, y: 1}
+        - {x: 2, y: 1}
+      - name: "\u25A0"
+        cells:
+        - {x: 0, y: 0}
+        - {x: 1, y: 0}
+        - {x: 0, y: 1}
+        - {x: 1, y: 1}
+    - units: 5
+      list:
+      - name: +
+        cells:
+        - {x: 1, y: 0}
+        - {x: 0, y: 1}
+        - {x: 1, y: 1}
+        - {x: 2, y: 1}
+        - {x: 1, y: 2}
+      - name: "\uD070\u3131"
+        cells:
+        - {x: 0, y: 0}
+        - {x: 1, y: 0}
+        - {x: 2, y: 0}
+        - {x: 2, y: 1}
+        - {x: 2, y: 2}
+      - name: "\uD070\u3134"
+        cells:
+        - {x: 0, y: 0}
+        - {x: 0, y: 1}
+        - {x: 0, y: 2}
+        - {x: 1, y: 2}
+        - {x: 2, y: 2}
+    rankNames:
+    - E
+    - D
+    - C
+    - B
+    - A
+    - S
+    rankThresholds: 020000000400000006000000080000000a000000
+    rankBonusPerStep: 0.02
+    bonusCellPercent: 5
+    fullRate: 200
+    maxRate: 200
+    fillMult:
+    - min: 200
+      mult: 1.5
+    - min: 150
+      mult: 1.2
+    - min: 100
+      mult: 1
+    overPerPoint: 0.01
+    upgrades:
+      compress:
+        name: "\uC555\uCD95 \uC801\uC7AC"
+        emoji: "\U0001F5DC\uFE0F"
+        max: 5
+        costs: 96000000fa000000900100005802000084030000
+      bonus:
+        name: "\uC6B0\uC120 \uC801\uC7AC \uCE78"
+        emoji: "\u2B50"
+        max: 5
+        costs: 96000000fa000000900100005802000084030000
+    objectives:
+      count: 0100000005000000
+      rank:
+        ranks: 010000000200000003000000
+        bonus: 00000000050000000a0000000f000000
+        bigTruckCells: 25
+      fill:
+      - rate: 100
+        bonus: 5
+      - rate: 150
+        bonus: 10
+      boxes:
+        min: 3
+        perCells: 4
+        bonusPer: 2
+      item:
+        bonus: 5
+      kinds:
+      - n: 2
+        bonus: 5
+      - n: 3
+        bonus: 10
+    albaTarget:
+      min: 0.6
+      max: 0.9
+    stuckDepartDelay: 10

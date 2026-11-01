@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APCenter 목업</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <div id="labels"></div>
+
+  <div id="hud">
+    <div id="clock-box"></div>
+    <div id="order-strip"></div>
+    <div id="event-banner" style="display:none"></div>
+    <div id="snack-bar"></div>
+    <div id="menu-bar"></div>
+    <div id="toasts"></div>
+    <div id="help"></div>
+  </div>
+
+  <div id="panel" class="hidden"></div>
+  <div id="debug" class="hidden"></div>
+  <div id="loading-overlay" class="hidden"></div>
+  <div id="drag-ghost"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/layout.js"></script>
+  <!-- 배치 시뮬레이터에서 내보낸 배치 (없으면 기본 배치) -->
+  <script src="layout-data.js"></script>
+  <script>const LAYOUT = LayoutLib.load();</script>
+  <script src="js/state.js"></script>
+  <script src="js/minigame/loading-logic.js"></script>
+  <script src="js/flow.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/alba.js"></script>
+  <script src="js/automation.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/labels.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/minigame/loading-ui.js"></script>
+  <script src="js/debug.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
