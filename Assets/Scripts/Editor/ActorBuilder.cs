@@ -134,6 +134,18 @@ namespace APC.EditorTools
             return prefab;
         }
 
+        // 컨베이어 위 물품: 흰 큐브 (색은 FlyerView가 바꾼다)
+        static GameObject FlyerPrefab()
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = "Flyer";
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            go.GetComponent<MeshRenderer>().sharedMaterial = MapBuilder.MaterialAsset(1);
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{PrefabDir}/Flyer.prefab");
+            Object.DestroyImmediate(go);
+            return prefab;
+        }
+
         // 범위 링: 루트(ZoneRing) / Fill(채운 원) / Line(테두리)
         static GameObject RingPrefab()
         {
@@ -209,6 +221,9 @@ namespace APC.EditorTools
             Set(root, "map", map);
             Set(root, "rig", cam.GetComponent<CameraRig>());
             Set(root, "actions", AssetDatabase.LoadAssetAtPath<InputActionAsset>("Assets/InputSystem_Actions.inputactions"));
+            // UI를 먼저 만들었으면 조이스틱 원을 연결 (UI 만들기 메뉴도 연결한다)
+            var mark = GameObject.Find("UI")?.transform.Find("Hud/JoystickMark");
+            if (mark) Set(root, "joystickMark", mark);
             var dn = game.AddComponent<DayNightView>();
             Set(dn, "cam", cam);
             Set(dn, "outsideGround", map.transform.Find("Floor/Outside").GetComponent<Renderer>());
@@ -216,6 +231,7 @@ namespace APC.EditorTools
             Set(fv, "map", map);
             Set(fv, "opaque", MapBuilder.MaterialAsset(1));
             Set(fv, "transparent", MapBuilder.MaterialAsset(0.5f));
+            Set(game.AddComponent<FlyerView>(), "flyerPrefab", FlyerPrefab().GetComponent<Renderer>());
 
             EditorSceneManager.MarkSceneDirty(map.gameObject.scene);
             EditorSceneManager.SaveScene(map.gameObject.scene);

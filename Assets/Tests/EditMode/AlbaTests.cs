@@ -155,6 +155,31 @@ namespace APC.Tests
                 Assert.IsTrue(seen.Any(s => s.StartsWith(expect)), "안 보인 상태: " + expect);
         }
 
+        // 할 일 없는 알바: 공정 대기 지점 근처에 서로 겹치지 않게 선다. 먼저 선 알바는 자리를 지킨다
+        [Test]
+        public void Idle_SpreadAroundStageSpot()
+        {
+            G.money = 100000;
+            G.stages["outbound"] = 3;
+            var list = Enumerable.Range(0, 3).Select(_ => HireOne()).ToList();
+            Albas.Assign(list[0], "outbound");
+            for (int i = 0; i < 100; i++) Sim.Update(Sim.STEP);
+            var first = list[0].idleSpot.Value;
+            var center = LAYOUT.idle["outbound"];
+            Assert.AreEqual(0, U.Dist(first, center), 1e-9, "처음 알바는 대기 지점 가운데");
+            Albas.Assign(list[1], "outbound");
+            Albas.Assign(list[2], "outbound");
+            for (int i = 0; i < 200; i++) Sim.Update(Sim.STEP);
+            Assert.IsTrue(list.All(a => a.status == "할 일 없음"));
+            Assert.AreEqual(first, list[0].idleSpot.Value);
+            for (int i = 0; i < 3; i++)
+            {
+                Assert.AreEqual(0, U.Dist(list[i].Pos, list[i].idleSpot.Value), 1e-6, "자리에 도착");
+                Assert.That(U.Dist(list[i].Pos, center), Is.LessThan(1.7));
+                for (int j = i + 1; j < 3; j++) Assert.That(U.Dist(list[i].Pos, list[j].Pos), Is.GreaterThanOrEqualTo(0.79));
+            }
+        }
+
         [Test]
         public void UpStage_Automation_ResetsAlba()
         {

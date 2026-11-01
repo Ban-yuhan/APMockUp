@@ -15,7 +15,11 @@ namespace APC
         [SerializeField] Image phaseFill, helpBg;
         [Tooltip("⏸, x1, x2, x4 순서")]
         [SerializeField] Button[] speedBtns;
-        [SerializeField] Button facilityBtn, upgradeBtn, albaBtn;
+        [SerializeField] Button facilityBtn, upgradeBtn, albaBtn, debugBtn;
+        [SerializeField] DebugView debug;
+        [Tooltip("이벤트 배너 (이벤트 중에만 켬)")]
+        [SerializeField] RectTransform eventBanner;
+        [SerializeField] TMP_Text eventText;
         [SerializeField] PanelView panel;
         [SerializeField] RectTransform orderStrip, toasts;
         [Header("프리팹")]
@@ -44,8 +48,8 @@ namespace APC
             facilityBtn.onClick.AddListener(() => panel.Toggle("facility"));
             upgradeBtn.onClick.AddListener(() => panel.Toggle("upgrade"));
             albaBtn.onClick.AddListener(() => panel.Toggle("alba"));
-            // shortcut: 원본 도움말의 "` 디버그"는 9단계(디버그 패널)에서 넣는다
-            help.text = "WASD·클릭 이동 · 바닥 원(상호작용 범위) 안에서 대기하면 자동 작업 · <b>E</b> 상차 미니게임 · 휠 확대 · 간식을 알바에게 드래그 · ESC 패널 닫기";
+            debugBtn.onClick.AddListener(debug.Toggle);
+            help.text = "WASD·드래그 이동 ·바닥 원(상호작용 범위) 안에서 대기하면 자동 작업 · <b>E</b> 상차 미니게임 · 휠 확대 · 간식을 알바에게 드래그 · <b>`</b> 디버그 · ESC 패널 닫기";
         }
 
         // GameRoot.Awake(-100)에서 Game.Setup이 Toast를 비우지 않으므로 OnEnable에서 구독해도 된다
@@ -58,6 +62,9 @@ namespace APC
             hudTimer -= Time.unscaledDeltaTime;
             if (hudTimer <= 0) { hudTimer = 0.2f; Refresh(); }
             UpdateToasts(Time.unscaledDeltaTime);
+            // 원본 pulse: 1.2초마다 1 ↔ 1.04 왕복
+            if (eventBanner.gameObject.activeSelf)
+                eventBanner.localScale = Vector3.one * (1 + 0.04f * Mathf.PingPong(Time.unscaledTime / 1.2f, 1));
         }
 
         // ---------- 시계·돈 ----------
@@ -87,6 +94,9 @@ namespace APC
             albaBtn.GetComponentInChildren<TMP_Text>().text = $"👷 알바 <size=12><color={Rich.SOFT}>{G.albas.Count}/{CONFIG.alba.max}</color></size>";
             help.color = day ? U.Hex(0x5b6775) : U.Hex(0xcfd8dc);
             helpBg.color = day ? new Color(1, 1, 1, .75f) : new Color(0, 0, 0, .4f);
+            eventBanner.gameObject.SetActive(G.eventName != null);
+            if (G.eventName != null)
+                eventText.text = $"<b>🎉 {CONFIG.evt.name}</b> <size=12><color=#fff3e0>주문 생성 속도 x{1 / CONFIG.evt.intervalMult} · {(day ? "밤" : "낮")}이 되면 종료</color></size>";
             RenderOrders();
         }
 

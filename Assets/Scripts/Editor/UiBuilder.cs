@@ -49,7 +49,7 @@ namespace APC.EditorTools
             if (!Object.FindFirstObjectByType<EventSystem>())
                 new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
-            // 그리는 순서: 월드 라벨 → HUD → 패널 → 상차 패널 (원본 #labels, #hud, #panel, #loading-overlay)
+            // 그리는 순서: 월드 라벨 → HUD → 패널 → 디버그 → 상차 패널 (원본 #labels, #hud, #panel, #debug, #loading-overlay)
             var labels = Rect("Labels", canvasGo.transform);
             Stretch(labels);
             var lv = labels.gameObject.AddComponent<LabelView>();
@@ -57,7 +57,8 @@ namespace APC.EditorTools
             var hud = Rect("Hud", canvasGo.transform);
             Stretch(hud);
             var panel = BuildPanel(canvasGo.transform, panelText, panelRow, albaRow);
-            BuildHud(hud, panel, orderCard, toast, snack);
+            var debug = BuildDebug(canvasGo.transform, panel);
+            BuildHud(hud, panel, debug, orderCard, toast, snack);
             BuildLoading(canvasGo.transform, cell, piece, mini, card);
 
             var scene = canvasGo.scene;
@@ -68,9 +69,36 @@ namespace APC.EditorTools
         // ---------- HUD ----------
         static readonly Color PANEL = new Color(1, 1, 1, .94f);
 
-        static void BuildHud(RectTransform hud, PanelView panel, Image orderCard, Image toast, RectTransform snack)
+        static void BuildHud(RectTransform hud, PanelView panel, DebugView debug, Image orderCard, Image toast, RectTransform snack)
         {
             var view = hud.gameObject.AddComponent<HudView>();
+
+            // 다이나믹 조이스틱: 누르기 시작한 위치에만 반투명 원 (조이스틱 UI 대신, 화면을 덜 가리게)
+            var mark = Img("JoystickMark", hud, new Color(30 / 255f, 90 / 255f, 168 / 255f, .3f));
+            mark.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+            mark.raycastTarget = false;
+            mark.rectTransform.anchorMin = mark.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            mark.rectTransform.sizeDelta = new Vector2(70, 70);
+            mark.gameObject.SetActive(false);
+            var root = Object.FindFirstObjectByType<GameRoot>();
+            if (root) SetRefs(root, ("joystickMark", mark.rectTransform));
+
+            // 이벤트 배너 (상단 가운데, 주문서 아래)
+            var banner = Img("EventBanner", hud, U.Hex(0xff7043));
+            banner.raycastTarget = false;
+            var br = banner.rectTransform;
+            br.anchorMin = br.anchorMax = new Vector2(0.5f, 1);
+            br.pivot = new Vector2(0.5f, 1);
+            br.anchoredPosition = new Vector2(0, -98);
+            var hbn = banner.gameObject.AddComponent<HorizontalLayoutGroup>();
+            hbn.padding = new RectOffset(16, 16, 6, 6);
+            hbn.childControlWidth = hbn.childControlHeight = true;
+            hbn.childForceExpandWidth = hbn.childForceExpandHeight = false;
+            Fit(banner.gameObject);
+            var eventText = Text("Text", br, 14);
+            eventText.color = Color.white;
+            banner.gameObject.SetActive(false);
+            SetRefs(view, ("debug", debug), ("eventBanner", br), ("eventText", eventText));
 
             // 좌상단 시계
             var clock = Img("ClockBox", hud, PANEL).rectTransform;
@@ -125,6 +153,10 @@ namespace APC.EditorTools
             var facility = MenuBtn("🏗️ 시설", menu);
             var upgrade = MenuBtn("⬆️ 업그레이드", menu);
             var albaBtn = MenuBtn("👷 알바", menu);
+            var debugBtn = MenuBtn("🛠️ 디버그", menu);
+            debugBtn.image.color = U.Hex(0xfffbea);
+            debugBtn.GetComponentInChildren<TMP_Text>().color = U.Hex(0x8a6d00);
+            SetRefs(view, ("debugBtn", debugBtn));
 
             // 우측 간식 바 (간식 칸은 SnackView가 설정 수만큼 만든다)
             var bar = Img("SnackBar", hud, PANEL).rectTransform;
@@ -231,23 +263,7 @@ namespace APC.EditorTools
             h.childControlWidth = h.childControlHeight = true;
             h.childForceExpandWidth = h.childForceExpandHeight = false;
 
-            var res = new TMP_DefaultControls.Resources
-            {
-                standard = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd"),
-                background = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd"),
-                inputField = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/InputFieldBackground.psd"),
-                knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd"),
-                checkmark = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Checkmark.psd"),
-                dropdown = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/DropdownArrow.psd"),
-                mask = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UIMask.psd"),
-            };
-            var dd = TMP_DefaultControls.CreateDropdown(res);
-            dd.name = "Assign";
-            dd.transform.SetParent(bottom, false);
-            Layout(dd, 170, 24);
-            foreach (var t in dd.GetComponentsInChildren<TMP_Text>(true)) { t.font = font; t.fontSize = 12; }
-            var dt = dd.GetComponent<TMP_Dropdown>();
-            dt.template.sizeDelta = new Vector2(0, 230);
+            var dd = Dropdown("Assign", bottom, 170);
 
             var status = Text("Status", bottom, 12);
             status.color = SOFT;
@@ -261,6 +277,175 @@ namespace APC.EditorTools
             hf.childControlWidth = hf.childControlHeight = true;
             hf.childForceExpandWidth = hf.childForceExpandHeight = false;
             return root.gameObject;
+        }
+
+        static TMP_DefaultControls.Resources UiRes() => new TMP_DefaultControls.Resources
+        {
+            standard = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd"),
+            background = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd"),
+            inputField = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/InputFieldBackground.psd"),
+            knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd"),
+            checkmark = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Checkmark.psd"),
+            dropdown = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/DropdownArrow.psd"),
+            mask = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UIMask.psd"),
+        };
+
+        static GameObject Dropdown(string name, Transform parent, float width)
+        {
+            var dd = TMP_DefaultControls.CreateDropdown(UiRes());
+            dd.name = name;
+            dd.transform.SetParent(parent, false);
+            Layout(dd, width, 24);
+            foreach (var t in dd.GetComponentsInChildren<TMP_Text>(true)) { t.font = font; t.fontSize = 12; }
+            dd.GetComponent<TMP_Dropdown>().template.sizeDelta = new Vector2(0, 230);
+            return dd;
+        }
+
+        static TMP_InputField Input(string name, Transform parent, float width)
+        {
+            var go = TMP_DefaultControls.CreateInputField(UiRes());
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            Layout(go, width, 24);
+            foreach (var t in go.GetComponentsInChildren<TMP_Text>(true)) { t.font = font; t.fontSize = 12; }
+            var f = go.GetComponent<TMP_InputField>();
+            f.contentType = TMP_InputField.ContentType.IntegerNumber;
+            f.placeholder.GetComponent<TMP_Text>().text = "";
+            return f;
+        }
+
+        // ---------- 디버그 패널 (원본 #debug) ----------
+        static DebugView BuildDebug(Transform canvas, PanelView panel)
+        {
+            var cfg = AssetDatabase.LoadAssetAtPath<ApcConfig>("Assets/Data/ApcConfig.asset");
+            Color gold = U.Hex(0xc9a227), ink = U.Hex(0x8a6d00), btnBg = Color.white;
+            var holder = Rect("Debug", canvas);
+            Stretch(holder);
+            var view = holder.gameObject.AddComponent<DebugView>();
+            var box = Img("Box", holder, U.Hex(0xfffdf3)).rectTransform;
+            box.anchorMin = new Vector2(1, 0); box.anchorMax = Vector2.one; box.pivot = Vector2.one;
+            box.offsetMin = new Vector2(-86 - 280, 230);
+            box.offsetMax = new Vector2(-86, -100);
+            var outline = box.gameObject.AddComponent<Outline>();
+            outline.effectColor = gold; outline.effectDistance = new Vector2(2, -2);
+            var viewport = Rect("Viewport", box);
+            Stretch(viewport);
+            viewport.offsetMin = new Vector2(12, 10);
+            viewport.offsetMax = new Vector2(-12, -10);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var content = Rect("Content", viewport);
+            content.anchorMin = new Vector2(0, 1); content.anchorMax = Vector2.one; content.pivot = new Vector2(0.5f, 1);
+            content.sizeDelta = Vector2.zero;
+            VLayout(content.gameObject, new RectOffset(), 4);
+            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var scroll = box.gameObject.AddComponent<ScrollRect>();
+            scroll.viewport = viewport; scroll.content = content;
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 30;
+
+            TMP_Text Label(string s, float size, Color c, Transform parent = null, bool bold = false)
+            {
+                var t = Text("Text", parent ?? content, size);
+                t.textWrappingMode = TextWrappingModes.Normal;
+                t.color = c;
+                t.text = bold ? $"<b>{s}</b>" : s;
+                return t;
+            }
+            void H3(string s) { var t = Label(s, 12, SOFT, null, true); t.margin = new Vector4(0, 6, 0, 0); }
+            Button Act(Transform parent, string label, string act, string arg = null)
+            {
+                var b = SmallBtn(label, parent, 12, btnBg, INK);
+                b.name = act;
+                var h = b.gameObject.AddComponent<HorizontalLayoutGroup>();
+                h.padding = new RectOffset(8, 8, 4, 4);
+                h.childControlWidth = h.childControlHeight = true;
+                h.childForceExpandWidth = h.childForceExpandHeight = false;
+                var o = b.gameObject.AddComponent<Outline>();
+                o.effectColor = U.Hex(0xd9c27a);
+                var da = b.gameObject.AddComponent<DebugAction>();
+                da.act = act; da.arg = arg;
+                return b;
+            }
+            Transform Row(params (string label, string act, string arg)[] btns)
+            {
+                var r = Rect("Row", content);
+                var h = r.gameObject.AddComponent<HorizontalLayoutGroup>();
+                h.spacing = 4;
+                h.childControlWidth = h.childControlHeight = true;
+                h.childForceExpandWidth = h.childForceExpandHeight = false;
+                foreach (var b in btns) Act(r, b.label, b.act, b.arg);
+                return r;
+            }
+
+            var close = Img("Close", box, Color.clear);
+            close.rectTransform.anchorMin = close.rectTransform.anchorMax = close.rectTransform.pivot = Vector2.one;
+            close.rectTransform.anchoredPosition = new Vector2(-4, -4);
+            close.rectTransform.sizeDelta = new Vector2(24, 24);
+            close.gameObject.AddComponent<Button>();
+            close.gameObject.AddComponent<DebugAction>().act = "close";
+            var ct = Text("Label", close.transform, 16);
+            Stretch(ct.rectTransform);
+            ct.alignment = TextAlignmentOptions.Center;
+            ct.color = SOFT;
+            ct.text = "✕";
+
+            Label("🛠️ 디버그", 15, ink, null, true);
+            var state = Label("", 12, SOFT);
+            int step = cfg.debug.moneyStep;
+            H3($"💰 돈 ({step:N0}원 단위)");
+            var moneyRow = Row();
+            var money = Input("MoneyInput", moneyRow, 100);
+            money.transform.SetAsFirstSibling();
+            Act(moneyRow, "+ 추가", "money-add");
+            Act(moneyRow, "- 차감", "money-sub");
+            Row(("+1,000", "money", "1000"), ("+10,000", "money", "10000"), ("+100,000", "money", "100000"));
+            Row(("0원으로", "money-zero", null));
+            H3("🕒 낮/밤");
+            Row(("낮/밤 전환 (시급·이벤트 판정 포함)", "phase", null));
+            Row(("낮/밤만 전환", "phase-only", null), ("+1시간", "hour", null));
+            H3($"🎉 이벤트 ({cfg.evt.name})");
+            Row(("강제 발동", "event-on", null), ("강제 종료", "event-off", null));
+            H3("📋 주문서");
+            Row(("+1", "orders", "1"), ("+5", "orders", "5"), ("대기 주문 비우기", "orders-clear", null));
+            H3("🚚 트럭");
+            Row(("입고 트럭 즉시 호출", "in-trucks", null), ("출고 트럭 즉시 호출", "out-trucks", null));
+            H3("👷 알바");
+            Row(("MT 전원 100", "mt", "100"), ("MT 전원 -60", "mt", "-60"), ("지원자 새로고침", "reroll", null));
+
+            H3("🧑‍🔧 알바 스탯 편집");
+            var empty = Label("고용한 알바가 없습니다", 12, SOFT);
+            var albaBox = Rect("AlbaBox", content);
+            VLayout(albaBox.gameObject, new RectOffset(), 4);
+            var select = Dropdown("AlbaSelect", albaBox, 0).GetComponent<TMP_Dropdown>();
+            var grid = Rect("Grid", albaBox);
+            var gl = grid.gameObject.AddComponent<GridLayoutGroup>();
+            gl.cellSize = new Vector2(82, 40);
+            gl.spacing = new Vector2(4, 4);
+            gl.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            gl.constraintCount = 3;
+            foreach (var (key, label) in new[] { ("str", "💪 힘"), ("agi", "🏃 민첩"), ("int", "🧠 지능"), ("sk-lift", "들기 Lv"), ("sk-carry", "나르기 Lv"),
+                ("sk-pack", "포장 Lv"), ("sk-inspect", "검수 Lv"), ("mt", "MT"), ("wage", "시급") })
+            {
+                var cell = Rect(key, grid);
+                VLayout(cell.gameObject, new RectOffset(), 1);
+                Label(label, 11, SOFT, cell);
+                var f = Input("Input", cell, 0);
+                var da = f.gameObject.AddComponent<DebugAction>();
+                da.act = "af"; da.arg = key;
+            }
+            // 알바가 없으면 묶음째 숨긴다
+            var unpaidRow = Row(("미지급: 아니오", "unpaid", null));
+            unpaidRow.SetParent(albaBox, false);
+            var unpaid = unpaidRow.GetComponentInChildren<Button>();
+            var effects = Label("", 12, INK, albaBox);
+            Row(("이 스탯·숙련도를 모든 알바에 적용", "alba-copy", null)).SetParent(albaBox, false);
+            H3("🏗️ 시설");
+            Row(("모든 시설 해금 (무료)", "unlock-all", null));
+
+            SetRefs(view, ("root", box.gameObject), ("state", state), ("albaEffects", effects), ("albaEmpty", empty), ("moneyInput", money),
+                ("albaBox", albaBox.gameObject), ("albaSelect", select), ("unpaidBtn", unpaid), ("panel", panel));
+            return view;
         }
 
         // 간식 칸 50×50: 아이콘 + MT 회복량

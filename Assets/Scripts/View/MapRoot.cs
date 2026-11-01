@@ -41,6 +41,9 @@ namespace APC
                     case PointKind.Idle: l.idle[p.id] = pos; break;
                 }
             }
+            foreach (var st in LayoutData.BELT_STAGES) l.belts[st] = new List<BeltLine>();
+            foreach (var b in GetComponentsInChildren<BeltPath>(true))
+                if (l.belts.TryGetValue(b.stage, out var lines)) lines.Add(b.ToLine());
             return l;
         }
 

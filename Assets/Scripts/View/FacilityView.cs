@@ -11,9 +11,12 @@ namespace APC
         [Tooltip("색은 Palette.Tint로 바꾼다. 잠긴 시설은 반투명 재질")]
         [SerializeField] Material opaque, transparent;
 
-        class BinObj { public Renderer body, sign; public Renderer[] cubes; public GameObject broken, arm; public string sig; }
+        class BinObj { public Renderer body, sign; public Renderer[] cubes; public GameObject broken, arm; public Transform pivot; public string sig; }
         class TableObj { public Renderer top; public Renderer[] items; public GameObject[] boxes; public GameObject machine; }
-        class DockObj { public Renderer pad; public GameObject[] cubes; public GameObject arm; public Transform truck; }
+        class DockObj { public Renderer pad; public GameObject[] cubes; public GameObject arm; public Transform pivot, truck; }
+
+        Transform belts;
+        float clock;   // 원본 World.sync의 t: 게임이 돌 때만(배속 반영) 흐른다
 
         Transform[] inTrucks;
         Renderer[] stagingCubes;
@@ -28,7 +31,7 @@ namespace APC
             bins = map.Points(PointKind.Bin).Select(p => new BinObj
             {
                 body = R(p, "Body"), sign = R(p, "Sign"), cubes = Kids<Renderer>(p.transform, "Cubes"),
-                broken = p.transform.Find("Broken").gameObject, arm = p.transform.Find("Arm").gameObject,
+                broken = p.transform.Find("Broken").gameObject, arm = p.transform.Find("Arm").gameObject, pivot = p.transform.Find("Arm/Pivot"),
             }).ToArray();
             tables = map.Points(PointKind.Table).Select(p => new TableObj
             {
@@ -39,14 +42,24 @@ namespace APC
             docks = map.Points(PointKind.Dock).Select(p => new DockObj
             {
                 pad = R(p, "Pad"), cubes = Kids<Transform>(p.transform, "Cubes").Select(t => t.gameObject).ToArray(),
-                arm = p.transform.Find("Arm").gameObject, truck = p.transform.Find("TruckSpot/Truck"),
+                arm = p.transform.Find("Arm").gameObject, pivot = p.transform.Find("Arm/Pivot"), truck = p.transform.Find("TruckSpot/Truck"),
             }).ToArray();
+            belts = map.transform.Find("Belts");
         }
 
         void LateUpdate()
         {
             var G = Game.G;
             if (G == null) return;
+            clock += GameRoot.ViewDt;
+
+            // 벨트는 그 공정이 자동화되면 깔린다 (원본 syncBelts)
+            if (belts)
+                foreach (var st in LayoutData.BELT_STAGES)
+                {
+                    var g = belts.Find(st);
+                    if (g && g.gameObject.activeSelf != S.IsAuto(st)) g.gameObject.SetActive(S.IsAuto(st));
+                }
 
             // 입고 트럭
             foreach (var tr in G.inTrucks)
@@ -85,8 +98,9 @@ namespace APC
                     }
                     o.broken.SetActive(b.broken > 0);
                 }
-                // shortcut: 기계손 회전은 8단계(자동화)에서
+                // 기계손: 검수 중이면 좌우로 흔든다 (원본 rotation.y = sin(t×6)×0.8, z 반전이라 각도 부호 반대)
                 o.arm.SetActive(b.unlocked && S.IsAuto("inspect"));
+                if (o.arm.activeSelf) o.pivot.localRotation = Quaternion.Euler(0, b.armProgress > 0 ? -Mathf.Sin(clock * 6) * 0.8f * Mathf.Rad2Deg : 0, 0);
             }
 
             // 포장대
@@ -104,7 +118,10 @@ namespace APC
                         }
                 for (; k < o.items.Length; k++) o.items[k].gameObject.SetActive(false);
                 for (int i = 0; i < o.boxes.Length; i++) o.boxes[i].SetActive(i < t.boxes.Count);
+                // 포장 기계: 포장 중이면 위아래로 (원본 |sin(t×8)|×0.15)
                 o.machine.SetActive(t.unlocked && S.IsAuto("pack"));
+                if (o.machine.activeSelf)
+                    o.machine.transform.localPosition = new Vector3(0, t.machineProgress > 0 ? Mathf.Abs(Mathf.Sin(clock * 8)) * 0.15f : 0, 0);
             }
 
             // 출고 도크와 트럭
@@ -116,6 +133,7 @@ namespace APC
                 Paint(o.pad, false, d.unlocked ? Palette.WithAlpha(col, 0.3f) : Palette.WithAlpha(U.Hex(Palette.LOCKED), 0.4f));
                 for (int i = 0; i < o.cubes.Length; i++) o.cubes[i].SetActive(i < d.waiting.Count);
                 o.arm.SetActive(d.unlocked && S.IsAuto("load"));
+                if (o.arm.activeSelf) o.pivot.localRotation = Quaternion.Euler(0, -(180 + Mathf.Sin(clock * 3) * 0.6f * Mathf.Rad2Deg), 0);
                 o.truck.gameObject.SetActive(d.truck != null);
                 if (d.truck != null) o.truck.position = CoordUtil.ToWorld(S.TruckPos(d.slot.truck, d.truck.off));
             }

@@ -48,7 +48,7 @@ namespace APC
             Docks.Update(dt);
             Player.Update(dt, input);
             Albas.Update(dt);
-            // shortcut: Auto.update는 8단계에서 이 뒤에 추가
+            Auto.Update(dt);
         }
 
         public static void TogglePhase()
@@ -62,8 +62,23 @@ namespace APC
             TogglePhase();
             if (G.phase == "day") Notify("☀️", $"{G.day}일차 아침이 밝았습니다");
             else Notify("🌙", "밤이 되었습니다");
-            // shortcut: 이벤트 시작·종료는 9단계에서 이 자리에 추가
+            if (G.eventName != null) EndEvent();
+            else if (U.Random() < CONFIG.evt.chance) StartEvent();
             Albas.OnPhaseChange();
+        }
+
+        // 명절 물류 폭주: 주문서가 한꺼번에 들어오고, 다음 낮/밤 전환까지 주문 간격이 줄어든다
+        public static void StartEvent()
+        {
+            G.eventName = CONFIG.evt.name;
+            for (int i = 0; i < CONFIG.evt.rushOrders; i++) Orders.Spawn();
+            Notify("🎉", $"{CONFIG.evt.name} 주문서 {CONFIG.evt.rushOrders}개가 한꺼번에 들어왔습니다!");
+        }
+
+        public static void EndEvent()
+        {
+            G.eventName = null;
+            Notify("🎉", $"{CONFIG.evt.name} 종료");
         }
     }
 }

@@ -18,7 +18,7 @@ namespace APC.EditorTools
 
         // 원본 COLORS
         const int GROUND = Palette.GROUND, CARDBOARD = Palette.CARDBOARD, BOX = Palette.BOX, BROKEN = Palette.BROKEN,
-            LOCKED = Palette.LOCKED, WOOD = Palette.WOOD, METAL_DARK = 0x455a64, ARM = 0xf39c12;
+            LOCKED = Palette.LOCKED, WOOD = Palette.WOOD, METAL_DARK = 0x455a64, ARM = 0xf39c12, BELT = 0x37474f;
 
         static bool persist;
         static readonly Dictionary<string, Material> mats = new Dictionary<string, Material>();
@@ -190,8 +190,80 @@ namespace APC.EditorTools
             var idle = Group(R, "Idle");
             foreach (var kv in l.idle) Point(idle, "Idle_" + kv.Key, PointKind.Idle, kv.Value, 0, kv.Key);
 
+            BeltPaths(R, l);
+            BeltMeshes(map, l);
+
             if (persist) AssetDatabase.SaveAssets();
             return root;
+        }
+
+        // ---------- 컨베이어 벨트 ----------
+        // 이미 있는 맵에 기본 배치의 벨트 라인을 넣는다 (시설 위치는 씬 기준)
+        [MenuItem("APC/기본 배치로 벨트 만들기")]
+        static void BeltMenu()
+        {
+            var cfg = AssetDatabase.LoadAssetAtPath<ApcConfig>("Assets/Data/ApcConfig.asset");
+            var map = Object.FindFirstObjectByType<MapRoot>();
+            persist = true;
+            BeltPaths(map.transform, DefaultLayout.Make(cfg));
+            BeltMeshes(map, map.Build());
+            EditorSceneManager.MarkSceneDirty(map.gameObject.scene);
+            EditorSceneManager.SaveScene(map.gameObject.scene);
+        }
+
+        // 벨트 점(P0, P1, ...)을 옮긴 뒤 모양만 다시 만든다
+        [MenuItem("APC/벨트 모양 갱신")]
+        static void BeltMeshMenu()
+        {
+            var map = Object.FindFirstObjectByType<MapRoot>();
+            persist = true;
+            BeltMeshes(map, map.Build());
+            EditorSceneManager.MarkSceneDirty(map.gameObject.scene);
+        }
+
+        // Map/Belts/공정/Line_id (BeltPath + 점 P0..Pn)
+        static void BeltPaths(Transform mapRoot, LayoutData l)
+        {
+            var old = mapRoot.Find("Belts");
+            if (old) Object.DestroyImmediate(old.gameObject);
+            var belts = Group(mapRoot, "Belts");
+            foreach (var st in LayoutData.BELT_STAGES)
+            {
+                var g = Group(belts, st);
+                if (!l.belts.TryGetValue(st, out var lines)) continue;
+                foreach (var ln in lines)
+                {
+                    var t = Group(g, "Line_" + ln.id);
+                    var bp = t.gameObject.AddComponent<BeltPath>();
+                    bp.stage = st; bp.id = ln.id;
+                    if (ln.from != null) { bp.fromFac = ln.from.fac; bp.fromIndex = ln.from.i; bp.fromPort = ln.from.port; bp.fromLine = ln.from.line; }
+                    if (ln.to != null) { bp.toFac = ln.to.fac; bp.toIndex = ln.to.i; bp.toPort = ln.to.port; bp.toLine = ln.to.line; }
+                    for (int i = 0; i < ln.points.Count; i++) Group(t, "P" + i).position = CoordUtil.ToWorld(ln.points[i]);
+                }
+            }
+        }
+
+        // 원본 World.belt: 구간마다 0.42 x 0.1 x (길이+0.42) 상자, 높이 0.06
+        static void BeltMeshes(MapRoot map, LayoutData l)
+        {
+            foreach (var bp in map.GetComponentsInChildren<BeltPath>(true))
+            {
+                var old = bp.transform.Find("Mesh");
+                if (old) Object.DestroyImmediate(old.gameObject);
+                var mesh = Group(bp.transform, "Mesh");
+                var line = l.belts[bp.stage].Find(x => x.id == bp.id);
+                var pts = APC.Belts.LinePts(l, bp.stage, line);
+                for (int i = 0; i < pts.Count - 1; i++)
+                {
+                    P a = pts[i], b = pts[i + 1];
+                    double dx = b.x - a.x, dz = b.z - a.z, len = System.Math.Sqrt(dx * dx + dz * dz);
+                    if (len < 0.01) continue;
+                    var m = Prim(PrimitiveType.Cube, mesh, "Seg_" + i, CoordUtil.ToWorld((a.x + b.x) / 2, (a.z + b.z) / 2, 0.06f),
+                        new Vector3(0.42f, 0.1f, (float)len + 0.42f), BELT, world: true);
+                    m.transform.rotation = Quaternion.Euler(0, CoordUtil.FacingYaw(dx, dz), 0);
+                    m.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+                }
+            }
         }
 
         // ---------- 휴게실 가구 (원본 syncCare: 9 x 7 기준, 구역 크기에 맞춰 늘이거나 줄인다) ----------
@@ -375,7 +447,8 @@ namespace APC.EditorTools
         static Material Mat(Color c, float alpha, Color? emissive = null)
         {
             string key = ColorUtility.ToHtmlStringRGB(c) + (alpha < 1 ? "_a" + Mathf.RoundToInt(alpha * 100) : "") + (emissive.HasValue ? "_e" + ColorUtility.ToHtmlStringRGB(emissive.Value) : "");
-            if (mats.TryGetValue(key, out var cached)) return cached;
+            // 테스트(persist = false)가 만든 임시 재질은 에셋으로 저장할 때 다시 쓰지 않는다
+            if (mats.TryGetValue(key, out var cached) && cached && (!persist || AssetDatabase.Contains(cached))) return cached;
             string path = $"{MatDir}/C_{key}.mat";
             var m = persist ? AssetDatabase.LoadAssetAtPath<Material>(path) : null;
             if (!m)

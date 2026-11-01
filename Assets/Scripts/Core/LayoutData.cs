@@ -64,6 +64,8 @@ namespace APC
 
         // 파생값 (원본 LayoutLib.prepare)
         public Bounds2 bounds;
+        public Dictionary<string, Belts.Graph> graphs = new Dictionary<string, Belts.Graph>();   // 공정별 벨트 경로망 (처음 쓸 때 만든다)
+        public Dictionary<string, List<P>> routes = new Dictionary<string, List<P>>();         // 경로 캐시
 
         public static readonly string[] BELT_STAGES = { "sort", "transfer", "outbound" };
 
@@ -72,6 +74,8 @@ namespace APC
         public LayoutData Prepare()
         {
             bounds = new Bounds2 { minX = ix1 + 0.6, maxX = ix2 - 0.6, minZ = iz1 + 0.6, maxZ = iz2 - 0.6 };
+            graphs.Clear();
+            routes.Clear();
             return this;
         }
 

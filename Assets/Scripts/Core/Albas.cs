@@ -128,6 +128,7 @@ namespace APC
             a.hand.Clear();
             ReleaseClaims(a);
             a.plan.Clear();
+            a.idleSpot = null;
             a.progress = 0;
             a.resting = false;
         }
@@ -272,6 +273,9 @@ namespace APC
 
         static List<Step> Plan(Alba a)
         {
+            // 대기 자리는 계속 할 일이 없을 때만 그대로 쓰고, 다른 계획을 세우면 내놓는다
+            var prevIdle = a.idleSpot;
+            a.idleSpot = null;
             if (S.HasKind(a, HandKind.Broken))
             {
                 a.status = "파손품 버리러 가는 중";
@@ -293,7 +297,29 @@ namespace APC
             var pl = Planners.For(a.stage, a);
             if (pl != null) return pl;
             a.status = "할 일 없음";
-            return new List<Step> { Step.Move(IdleSpot(a)), Step.Wait(0.8) };
+            a.idleSpot = prevIdle ?? IdleSpot(a);
+            return new List<Step> { Step.Move(a.idleSpot.Value), Step.Wait(0.8) };
+        }
+
+        // 공정별 대기 지점(LAYOUT.idle)을 중심으로, 다른 알바가 잡은 자리와 겹치지 않는 가장 가까운 자리
+        // 원본은 id로 정한 고정 자리(3칸)라 같은 공정 알바가 겹쳐서 바꿨다 (사용자 요청)
+        const double IDLE_GAP = 0.8;
+
+        static P IdleSpot(Alba a)
+        {
+            var c = LAYOUT.idle[a.stage];
+            var bd = LAYOUT.bounds;
+            for (int ring = 0; ; ring++)
+            {
+                int n = ring == 0 ? 1 : ring * 6;
+                for (int k = 0; k < n; k++)
+                {
+                    double ang = 2 * Math.PI * k / n;
+                    var p = new P(U.Clamp(c.x + Math.Cos(ang) * ring * IDLE_GAP, bd.minX, bd.maxX),
+                                  U.Clamp(c.z + Math.Sin(ang) * ring * IDLE_GAP, bd.minZ, bd.maxZ));
+                    if (!G.albas.Any(o => o != a && o.idleSpot != null && U.Dist(o.idleSpot.Value, p) < IDLE_GAP - 1e-6)) return p;
+                }
+            }
         }
 
         static List<Step> RestPlan(Alba a)
@@ -315,13 +341,6 @@ namespace APC
                 }
                 return StepResult.Wait;
             }) };
-        }
-
-        static P IdleSpot(Alba a)
-        {
-            var s = LAYOUT.idle[a.stage];
-            int o = a.id % 3 - 1;
-            return new P(s.x + o * 0.7, s.z + o * 0.5);
         }
 
         public static T NearestOf<T>(IEnumerable<T> list, P pos, Func<T, P> posFn)

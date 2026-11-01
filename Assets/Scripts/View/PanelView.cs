@@ -53,6 +53,9 @@ namespace APC
             Render(true);
         }
 
+        // 바깥(디버그 패널)에서 상태를 바꾼 뒤 바로 다시 그린다
+        public void Refresh() { if (panelName != null) Render(true); }
+
         public void Close()
         {
             panelName = null;

@@ -155,6 +155,7 @@ namespace APC
         public double restT, flee, progress, fx;
         public string status = "대기";
         public List<Step> plan = new List<Step>();
+        public P? idleSpot;   // 할 일 없을 때 잡아 둔 대기 자리 (다른 알바와 겹치지 않게)
     }
 
     public class GameState
