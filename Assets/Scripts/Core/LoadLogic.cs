@@ -105,12 +105,15 @@ namespace APC
 
         public static int RankIndex(int count) => CONFIG.loading.rankThresholds.Count(t => count >= t);
 
-        // 혼합 박스는 들어간 타입마다 1개씩 센다
+        // 지게차 묶음은 든 박스 수 (출고 수·랭크·박스 목표에 쓴다)
+        public static int BoxCount(List<Box> boxes) => boxes.Sum(b => b.Count);
+
+        // 혼합 박스는 들어간 타입마다 1개씩 센다. 묶음은 든 박스마다 센다
         public static Dictionary<string, RankInfo> Ranks(List<Box> boxes)
         {
             var output = new Dictionary<string, RankInfo>();
             foreach (var t in CONFIG.types) output[t.id] = new RankInfo();
-            foreach (var b in boxes) foreach (var t in b.types) output[t].count++;
+            foreach (var b in boxes) foreach (var pb in b.parts ?? new List<Box> { b }) foreach (var t in pb.types) output[t].count++;
             foreach (var r in output.Values) r.rank = RankIndex(r.count);
             return output;
         }
@@ -177,7 +180,7 @@ namespace APC
                 {
                     case "rank": { int r = ranks[o.type].rank; done = r >= o.rank; now = rn[r]; break; }
                     case "fill": done = fill.rate >= o.rate; now = U.Round(fill.rate) + "%"; break;
-                    case "boxes": done = boxes.Count >= o.n; now = $"{boxes.Count}/{o.n}"; break;
+                    case "boxes": { int n = BoxCount(boxes); done = n >= o.n; now = $"{n}/{o.n}"; break; }
                     case "item": { int n = boxes.Count(b => b.items.TryGetValue(o.item, out int q) && q > 0); done = n > 0; now = n + "개"; break; }
                     case "kinds": done = typeCount >= o.n; now = $"{typeCount}/{o.n}"; break;
                 }

@@ -260,7 +260,12 @@ namespace APC
                 double sp = Speed(a) * dt;
                 a.moving = true;
                 if (d <= sp) { a.x = step.x; a.z = step.z; a.plan.RemoveAt(0); }
-                else { a.x += dx / d * sp; a.z += dz / d * sp; a.facing = Math.Atan2(dx, dz); }
+                else
+                {
+                    var np = Forklifts.Avoid(a.Pos, dx / d, dz / d, sp);
+                    a.facing = Math.Atan2(np.x - a.x, np.z - a.z);
+                    a.x = np.x; a.z = np.z;
+                }
             }
             else
             {

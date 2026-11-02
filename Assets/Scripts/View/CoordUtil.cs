@@ -48,5 +48,8 @@ namespace APC
 
         // 원본 facing(라디안, atan2(vx, vz)) → Unity yaw
         public static float FacingToYaw(double facing) => FacingYaw(Math.Sin(facing), Math.Cos(facing));
+
+        // 위 함수의 역변환 (Unity yaw → facing)
+        public static double YawToFacing(float yaw) => Math.PI - yaw * Math.PI / 180;
     }
 }

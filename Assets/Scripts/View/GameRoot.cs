@@ -29,7 +29,7 @@ namespace APC
         [Tooltip("이만큼(캔버스 px) 끌어야 이동으로 본다. 그보다 짧으면 클릭")]
         [SerializeField] float dragThreshold = 12;
 
-        InputAction move, zoom, interact;
+        InputAction move, zoom, interact, summon;
         bool pressing, joystick;
         Vector2 origin;
         static readonly List<RaycastResult> uiHits = new List<RaycastResult>();
@@ -42,6 +42,7 @@ namespace APC
             move = m.FindAction("Move", true);
             zoom = m.FindAction("Zoom", true);
             interact = m.FindAction("Interact", true);
+            summon = m.FindAction("Summon", true);
             m.Enable();
         }
 
@@ -64,6 +65,8 @@ namespace APC
             ViewDt = Running ? FrameDt * Game.G.speed : 0;
             UpdateJoystick();
             Sim.input = joystick ? JoystickVector() : InputVector();
+            var mv = move.ReadValue<Vector2>();
+            Sim.drive = joystick ? JoystickDrive() : new P(mv.x, mv.y);
             // 상차 패널이 열려 있으면 월드 입력을 막는다 (원본 UI.bindInput)
             if (Loading.dock == null)
             {
@@ -73,7 +76,11 @@ namespace APC
                 {
                     var d = Player.LoadableDock();
                     if (d != null) Loading.Open(d);
+                    // 지게차 운전 중 도크 앞이면 파렛트 묶음을 싣는 상차, 아니면 하차
+                    else if ((d = Forklifts.LoadableDock()) != null) Loading.Open(d, Forklifts.Ridden());
+                    else Forklifts.ToggleRide();
                 }
+                if (summon.WasPressedThisFrame()) Forklifts.ToggleSummon();
             }
             Sim.Frame(FrameDt);
         }
@@ -108,6 +115,13 @@ namespace APC
         {
             var d = Pointer.current.position.ReadValue() - origin;
             return CameraCorrect(d.x, -d.y);
+        }
+
+        // 지게차용: 끈 방향 그대로 (오른쪽 = 조향 오른쪽, 위 = 전진), 길이 1로
+        P JoystickDrive()
+        {
+            var d = (Pointer.current.position.ReadValue() - origin).normalized;
+            return new P(d.x, d.y);
         }
 
         // 화면 기준 WASD → 월드 방향 (카메라가 살짝 비스듬해서 보정). 원본 UI.inputVector

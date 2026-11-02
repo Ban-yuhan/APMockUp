@@ -62,6 +62,8 @@ namespace APC
         public string primary;
         public SortedDictionary<int, int> items = new SortedDictionary<int, int>();
         public int claimedBy = Owner.None;
+        public List<Box> parts;   // 지게차 묶음이면 든 박스들 (null = 일반 박스)
+        public int Count => parts?.Count ?? 1;
     }
 
     public class Table
@@ -141,6 +143,29 @@ namespace APC
         public Zone zone;
     }
 
+    // 지게차: x, z = 차체 중심, heading = facing과 같은 규칙(atan2(vx, vz)), speed = 앞(포크) 방향 속도
+    // 치수·주행 값은 씬의 ForkliftView가 넣는다
+    public class Forklift
+    {
+        public double x, z, heading, speed;
+        public double length, width, frontAxle, halfTrack;   // frontAxle: 중심 → 앞차축 거리
+        public double maxSpeed, reverseSpeed, accel, brake, turnRate, pivotRate;   // 회전은 도/초
+        public bool ridden;
+        public bool summon, shown = true;   // summon: R로 꺼내고 넣는 지게차, shown: 맵에 나와 있음
+        public List<Box> pallet = new List<Box>();   // 파렛트에 올린 묶음
+        public List<Box> loose = new List<Box>();    // 아직 묶지 않은 낱개 박스 (bundleSize개가 되면 묶음으로)
+        public double workTimer;
+        public string action;   // 도크 앞에서 하는 일 표기 (null = 없음)
+
+        public Forklift Clone()
+        {
+            var f = (Forklift)MemberwiseClone();
+            f.pallet = new List<Box>();
+            f.loose = new List<Box>();
+            return f;
+        }
+    }
+
     public class Candidate { public string name; public int str, agi, intel, wage; }
 
     public class Alba : Actor
@@ -186,6 +211,7 @@ namespace APC
         public List<Flyer> flyers = new List<Flyer>();
         public string eventName;   // null = 이벤트 없음
         public PlayerState player;
+        public List<Forklift> forklifts = new List<Forklift>();   // 씬의 ForkliftView가 넣는다
 
         public static GameState Create()
         {

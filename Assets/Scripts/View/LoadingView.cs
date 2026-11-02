@@ -31,6 +31,8 @@ namespace APC
         Drag drag;
         Dock shown;
         readonly List<(RectTransform rt, Box box)> cards = new List<(RectTransform, Box)>();
+        // 지게차 묶음 칸: 칸 좌표로 색상을 밀어서 무지개가 대각선으로 흐른다
+        readonly List<(Image img, Vector2Int c, float a)> rainbow = new List<(Image, Vector2Int, float)>();
 
         static readonly string[] RANK_COLORS = { "#9e9e9e", "#8d6e63", "#43a047", "#1e88e5", "#8e24aa", "#f9a825" };
         const string SOFT = "#5b6775";
@@ -55,6 +57,15 @@ namespace APC
                 if (shown != null) Render();
             }
             if (shown != null) HandleInput();
+            if (shown != null) Rainbow();
+        }
+
+        void Rainbow()
+        {
+            rainbow.RemoveAll(r => !r.img);
+            float t = Time.unscaledTime * 0.6f;
+            foreach (var (img, c, a) in rainbow)
+                img.color = WithA(Color.HSVToRGB(Mathf.Repeat(t - (c.x + c.y) * 0.12f, 1), 0.55f, 1), a);
         }
 
         // ---------- 입력 ----------
@@ -233,11 +244,12 @@ namespace APC
                     var piece = Instantiate(piecePrefab, piecesRoot);
                     Place(piece.rectTransform, c.x, c.y, CS);
                     piece.color = WithA(BoxColor(pl.box), dragging ? 0.25f : 0.92f);
+                    if (pl.box.parts != null) rainbow.Add((piece, c, piece.color.a));
                     piece.transform.Find("Top").gameObject.SetActive(!set.Contains(c + Vector2Int.down));
                     piece.transform.Find("Right").gameObject.SetActive(!set.Contains(c + Vector2Int.right));
                     piece.transform.Find("Bottom").gameObject.SetActive(!set.Contains(c + Vector2Int.up));
                     piece.transform.Find("Left").gameObject.SetActive(!set.Contains(c + Vector2Int.left));
-                    piece.transform.Find("Label").GetComponent<TMP_Text>().text = i == 0 ? Emojis(pl.box) : "";
+                    piece.transform.Find("Label").GetComponent<TMP_Text>().text = i != 0 ? "" : pl.box.parts != null ? $"🌈×{pl.box.Count}" : Emojis(pl.box);
                     int n = occ[c];
                     var over = piece.transform.Find("Over").gameObject;
                     over.SetActive(n > 1);
@@ -246,19 +258,24 @@ namespace APC
             }
 
             // 오른쪽: 출고 대기 박스
-            listHeader.text = $"<b>출고 대기 박스 ({d.waiting.Count})</b>";
-            emptyHint.gameObject.SetActive(d.waiting.Count == 0);
+            var waiting = Loading.Waiting();
+            int bundled = waiting.Count(b => b.parts != null);
+            listHeader.text = $"<b>출고 대기 박스 ({waiting.Count - bundled})</b>" + (bundled > 0 ? $" <color=#8e24aa>🌈 파렛트 묶음 {bundled}</color>" : "");
+            emptyHint.gameObject.SetActive(waiting.Count == 0);
             Clear(list);
             cards.Clear();
-            foreach (var b in d.waiting)
+            // 묶음을 위로
+            foreach (var b in waiting.OrderBy(b => b.parts == null))
             {
                 var card = Instantiate(cardPrefab, list);
                 var shape = (RectTransform)card.Find("Shape");
-                var size = MiniShape(shape, b.cells, 16, BoxColor(b));
+                var size = MiniShape(shape, b);
                 var info = (RectTransform)card.Find("Info");
                 info.offsetMin = new Vector2(8 + size.x + 8, info.offsetMin.y);
                 string items = string.Join(" ", b.items.Select(kv => $"{CONFIG.items[kv.Key].emoji}x{kv.Value}"));
-                info.GetComponent<TMP_Text>().text = $"<b>#{b.id}</b> {Emojis(b)} {b.cells.Count}칸\n{Small(items)}\n{Small("💰" + U.Money(b.reward))}";
+                string head = b.parts != null ? $"<b>🌈 묶음 #{b.id}</b> 박스 {b.Count}개 · {b.cells.Count}칸" : $"<b>#{b.id}</b> {Emojis(b)} {b.cells.Count}칸";
+                string bonus = b.parts != null ? $" (묶음 x{L.bundleRewardMult:F1})" : "";
+                info.GetComponent<TMP_Text>().text = $"{head}\n{Small(items)}\n{Small("💰" + U.Money(b.reward) + bonus)}";
                 card.GetComponent<LayoutElement>().preferredHeight = Mathf.Max(size.y, 50) + 12;
                 cards.Add((card, b));
             }
@@ -284,17 +301,19 @@ namespace APC
         void BuildGhost()
         {
             Clear(ghost);
-            MiniShape(ghost, drag.cells, CS, BoxColor(drag.box));
+            MiniShape(ghost, drag.box, drag.cells, CS);
         }
 
-        // 작은 블록 모양 (원본 miniShape). 크기를 돌려준다
-        Vector2 MiniShape(RectTransform root, List<Vector2Int> cells, float size, Color color)
+        // 작은 블록 모양 (원본 miniShape). 크기를 돌려준다. 묶음이면 무지개
+        Vector2 MiniShape(RectTransform root, Box box, List<Vector2Int> cells = null, float size = 16)
         {
+            cells ??= box.cells;
             foreach (var c in cells)
             {
                 var i = Instantiate(miniPrefab, root);
                 Place(i.rectTransform, c.x, c.y, size, size - 2);
-                i.color = color;
+                i.color = BoxColor(box);
+                if (box.parts != null) rainbow.Add((i, c, 1));
             }
             var w = cells.Max(c => c.x) + 1;
             var h = cells.Max(c => c.y) + 1;

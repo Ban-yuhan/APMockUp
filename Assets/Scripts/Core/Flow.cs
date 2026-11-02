@@ -161,10 +161,10 @@ namespace APC
             if (p.boxes.Count == 0) return null;
             G.money += p.total;
             G.earned += p.total;
-            G.shipped += p.boxes.Count;
+            G.shipped += LoadLogic.BoxCount(p.boxes);
             G.trucks++;
             string obj = p.objectives.Count > 0 ? $" (🎯 {p.objectives.Count(o => o.done)}/{p.objectives.Count} +{p.objBonus}%p)" : "";
-            Notify("🚛", $"{CONFIG.destinations[d.idx].name} 트럭 출발! 박스 {p.boxes.Count}개 · 적재율 {U.Round(p.rate)}%{obj} · +💰{U.Money(p.total)}");
+            Notify("🚛", $"{CONFIG.destinations[d.idx].name} 트럭 출발! 박스 {LoadLogic.BoxCount(p.boxes)}개 · 적재율 {U.Round(p.rate)}%{obj} · +💰{U.Money(p.total)}");
             tr.state = TruckState.Leaving;
             d.loader = Owner.None;
             d.stuckTimer = 0;

@@ -9,6 +9,8 @@ namespace APC
 
         // 이번 프레임의 이동 입력 (원본은 매 스텝 UI.inputVector()를 읽는다. 프레임 안에서는 같은 값)
         public static P input;
+        // 지게차 운전 입력: x = 좌우(조향), z = 앞뒤(가속). 카메라 보정 없는 원래 값
+        public static P drive;
 
         // 원본 Main.init 중 상태 준비: 플레이어 생성, 첫 입고 트럭은 바로 도착
         public static void Start()
@@ -46,6 +48,7 @@ namespace APC
             Inbound.Update(dt);
             Orders.Update(dt);
             Docks.Update(dt);
+            Forklifts.Update(dt, drive);
             Player.Update(dt, input);
             Albas.Update(dt);
             Auto.Update(dt);

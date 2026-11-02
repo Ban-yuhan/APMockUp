@@ -281,6 +281,9 @@ namespace APC
         public ObjectivesCfg objectives = new ObjectivesCfg();
         public AlbaTargetCfg albaTarget = new AlbaTargetCfg();   // 고정 적재율: 전체 칸 중 채우는 비율
         public double stuckDepartDelay = 10;
+        // 지게차 묶음: 출고 대기 박스 bundleSize개(2×2×2)를 한 조각으로. 파렛트에 palletCap묶음(2×2×2)까지
+        public int bundleSize = 8, palletCap = 8;
+        public double bundleRewardMult = 1.2;    // 묶음 대금 = 든 박스 대금 합 × 이 값
 
         public List<ShapeDef> Shapes(int units) => shapes.Find(g => g.units == units).list;
 

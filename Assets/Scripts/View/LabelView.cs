@@ -193,6 +193,11 @@ namespace APC
                     ph += Rich.Bar(p.progress / max);
                 }
             }
+            // 지게차 운전 중: 파렛트가 가리지 않게 E 안내만 반투명으로 (묶음·낱개는 파렛트에 보인다)
+            bool riding = Forklifts.Riding;
+            if (riding) ph = $"<b>{(Forklifts.LoadableDock() != null ? "[E] 상차하기" : "[E] 하차")}</b>";
+            else if (Forklifts.CanBoard()) ph += "\n<color=#ffca28><b>[E] 지게차 탑승</b></color>";
+            player.bg.color = Palette.WithAlpha(U.Hex(0xe3eefc), riding ? 0.35f : 1);
             Set(player, ph);
 
             // 알바 라벨: 고용·해고에 맞춰 만들고 지운다

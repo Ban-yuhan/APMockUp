@@ -17,6 +17,8 @@ namespace APC
         public static void Update(double dt, P input)
         {
             var p = G.player;
+            // 지게차 운전 중: 위치는 Forklifts가 맞추고, 시설 작업은 하지 않는다
+            if (Forklifts.Riding) return;
             double vx = input.x, vz = input.z, step = CONFIG.player.speed * dt;
             if (vx != 0 || vz != 0)
             {
