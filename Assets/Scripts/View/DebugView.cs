@@ -44,11 +44,17 @@ namespace APC
             root.SetActive(false);
         }
 
+        // 패널은 한 번에 하나: 디버그를 열면 열려 있던 패널을 닫는다
         public void Toggle()
         {
             root.SetActive(!root.activeSelf);
-            if (root.activeSelf) { timer = 0; RenderAlba(); }
+            if (!root.activeSelf) return;
+            panel.Close();
+            timer = 0;
+            RenderAlba();
         }
+
+        public void Close() => root.SetActive(false);
 
         void Run(string act, string arg)
         {

@@ -60,7 +60,7 @@ namespace APC
             bg.color = style == Style.Me ? U.Hex(0xe3eefc) : style == Style.Actor ? new Color(1, 1, 1, .92f)
                 : new Color(22 / 255f, 30 / 255f, 42 / 255f, style == Style.SmallDim ? .55f : .82f);
             lb.text.color = actor ? U.Hex(0x1f2933) : Color.white;
-            lb.text.fontSize = style == Style.Normal ? 12 : 11;
+            lb.text.fontSize = style == Style.Normal ? 17 : 16;
             if (style == Style.Me) lb.text.fontStyle = FontStyles.Bold;
             lb.btn.onClick.AddListener(() => lb.act?.Invoke());
             labels.Add(lb);
@@ -127,7 +127,7 @@ namespace APC
                 if (!b.unlocked) { Set(bins[i], Locked($"{it.emoji} {it.name}", b.slot.cost), () => Shop.BuyBin(i)); continue; }
                 string arm = S.IsAuto("inspect") && b.armProgress > 0 ? " 🦾" : "";
                 string full = S.InboundRoom(i) <= 0 ? " ⛔" : "";
-                Set(bins[i], $"<b>{it.emoji} {it.name}</b>{arm}{full}\n✅{b.checkedCount} ❔{b.uncheckedCount}{(b.broken > 0 ? " 💔" + b.broken : "")} {Rich.Small($"/{S.BinCap()}", 11, "#b0bec5")}");
+                Set(bins[i], $"<b>{it.emoji} {it.name}</b>{arm}{full}\n✅{b.checkedCount} ❔{b.uncheckedCount}{(b.broken > 0 ? " 💔" + b.broken : "")} {Rich.Small($"/{S.BinCap()}", 0, "#b0bec5")}");
             }
 
             foreach (var t in G.tables)
@@ -149,7 +149,6 @@ namespace APC
                 Set(tables[i], html);
             }
 
-            var loadable = Player.LoadableDock();
             foreach (var d in G.docks)
             {
                 if (d.slot == null) continue;
@@ -158,7 +157,6 @@ namespace APC
                 if (!d.unlocked) { Set(docks[i], Locked($"{dest.name} 도크", d.slot.cost), () => Shop.BuyDock(i)); continue; }
                 string html = $"<b><color={Rich.Hex(dest.color)}>🏁 {dest.name}</color></b> 📦{d.waiting.Count}";
                 var tr = d.truck;
-                Action act = null;
                 if (tr == null) html += $"\n🚛 도착까지 {Math.Ceiling(d.truckTimer)}초";
                 else if (tr.state != TruckState.Present) html += "\n🚛 이동 중";
                 else
@@ -167,13 +165,9 @@ namespace APC
                     html += $"\n🚛 {tr.def.name}({tr.w}×{tr.h}) {U.Round(pay.rate)}%";
                     if (tr.mode == "auto") html += S.IsAuto("load") ? " 🦾" : " 👷";
                     else if (tr.objectives.Count > 0) html += $" 🎯{pay.objectives.Count(o => o.done)}/{tr.objectives.Count}";
-                    if (loadable == d)
-                    {
-                        html += "\n<color=#ffca28><b>[E] 상차하기</b></color>";
-                        act = () => Loading.Open(d);
-                    }
                 }
-                Set(docks[i], html, act);
+                // 상차는 오른쪽 상차 버튼 (LoadButtonView)
+                Set(docks[i], html);
             }
 
             Set(trash, "🗑️ 쓰레기통");
@@ -183,22 +177,15 @@ namespace APC
             else Set(purifier, $"🌬️ {C.care.tierNames[G.carePurifier]} 공기청정기");
 
             var p = G.player;
+            // 이름표에는 이름·손에 든 것·작업 진행 막대만 (구역·안내 문구는 띄우지 않는다)
             string ph = $"👔 관리자 {HandIcons(p.hand)}";
-            if (p.zone != null)
+            if (p.zone != null && p.busy != null)
             {
-                ph += $"\n<color={Rich.ACCENT}>{Zones.Name(p.zone)}</color> · {p.action ?? "…"}";
-                if (p.busy != null)
-                {
-                    double max = p.busy == "inspect" ? C.timing.inspect : C.timing.pack;
-                    ph += Rich.Bar(p.progress / max);
-                }
+                double max = p.busy == "inspect" ? C.timing.inspect : C.timing.pack;
+                ph += Rich.Bar(p.progress / max);
             }
-            // 지게차 운전 중: 파렛트가 가리지 않게 E 안내만 반투명으로 (묶음·낱개는 파렛트에 보인다)
-            bool riding = Forklifts.Riding;
-            if (riding) ph = $"<b>{(Forklifts.LoadableDock() != null ? "[E] 상차하기" : "[E] 하차")}</b>";
-            else if (Forklifts.CanBoard()) ph += "\n<color=#ffca28><b>[E] 지게차 탑승</b></color>";
-            player.bg.color = Palette.WithAlpha(U.Hex(0xe3eefc), riding ? 0.35f : 1);
-            Set(player, ph);
+            // 지게차 운전 중: 파렛트가 가리지 않게 라벨을 숨긴다 (탑승·하차·상차는 오른쪽 버튼)
+            Set(player, Forklifts.Riding ? "" : ph);
 
             // 알바 라벨: 고용·해고에 맞춰 만들고 지운다
             foreach (var id in albaLabels.Keys.Where(id => !G.albas.Any(a => a.id == id)).ToList())

@@ -55,6 +55,7 @@ namespace APC
         public static void Place(Box box, List<UnityEngine.Vector2Int> cells, Placement placement)
         {
             var tr = Truck;
+            if (!LoadLogic.InTruck(tr, cells)) return;
             if (placement != null) placement.cells = cells;
             else
             {
@@ -79,7 +80,7 @@ namespace APC
 
         public static void Depart()
         {
-            if (Truck.placements.Count == 0) return;
+            if (Truck.placements.Count == 0 || LoadLogic.Invalid(Truck).Count > 0) return;
             Docks.Depart(dock);
         }
     }

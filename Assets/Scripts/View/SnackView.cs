@@ -24,7 +24,7 @@ namespace APC
             foreach (var s in CONFIG.snacks)
             {
                 var rt = Instantiate(snackPrefab, transform);
-                rt.GetComponentInChildren<TMP_Text>().text = $"{s.emoji}\n<size=10><b><color={Rich.GOOD}>+{s.mt}</color></b></size>";
+                rt.GetComponentInChildren<TMP_Text>().text = $"{s.emoji}\n<size=45%><b><color={Rich.GOOD}>+{s.mt}</color></b></size>";
                 items.Add((rt, s));
             }
             ghost.gameObject.SetActive(false);

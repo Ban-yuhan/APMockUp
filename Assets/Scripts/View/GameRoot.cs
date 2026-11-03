@@ -32,6 +32,8 @@ namespace APC
         InputAction move, zoom, interact, summon;
         bool pressing, joystick;
         Vector2 origin;
+        float pinchDist;   // 직전 프레임 두 손가락 사이 거리 (px)
+        bool pinching;     // 손가락을 모두 뗄 때까지 유지 (핀치 뒤 남은 한 손가락이 조이스틱이 되지 않게)
         static readonly List<RaycastResult> uiHits = new List<RaycastResult>();
 
         void Awake()
@@ -63,7 +65,8 @@ namespace APC
         {
             FrameDt = Mathf.Min(0.1f, Time.deltaTime);
             ViewDt = Running ? FrameDt * Game.G.speed : 0;
-            UpdateJoystick();
+            if (UpdatePinch()) StopJoystick();
+            else UpdateJoystick();
             Sim.input = joystick ? JoystickVector() : InputVector();
             var mv = move.ReadValue<Vector2>();
             Sim.drive = joystick ? JoystickDrive() : new P(mv.x, mv.y);
@@ -102,6 +105,33 @@ namespace APC
             joystickMark.gameObject.SetActive(true);
             RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)joystickMark.parent, origin, null, out var lp);
             joystickMark.anchoredPosition = lp;
+        }
+
+        // 두 손가락 핀치 줌 (휴대폰). 벌리면 확대, 오므리면 축소. 핀치 중이면 true
+        // UI 위에서 시작한 핀치(패널 스크롤 등)는 무시
+        bool UpdatePinch()
+        {
+            var ts = Touchscreen.current;
+            if (ts == null || Loading.dock != null) { pinching = false; return false; }
+            int n = 0;
+            Vector2 a = default, b = default;
+            foreach (var t in ts.touches)
+            {
+                if (!t.press.isPressed) continue;
+                if (n == 0) a = t.position.ReadValue(); else if (n == 1) b = t.position.ReadValue();
+                n++;
+            }
+            if (n == 0) { pinching = false; return false; }
+            if (n < 2) return pinching;
+            float dist = (a - b).magnitude;
+            if (!pinching)
+            {
+                if (OverUI(a) || OverUI(b)) return false;
+                pinching = true;
+            }
+            else if (pinchDist > 1) rig.ZoomScale(dist / pinchDist);
+            pinchDist = dist;
+            return true;
         }
 
         void StopJoystick()

@@ -122,10 +122,15 @@ namespace APC
             palletRoot.gameObject.SetActive(false);
         }
 
+        static Material palletMat;
+
         static Renderer Cube(Transform parent, Vector3 pos, Vector3 scale)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             Destroy(go.GetComponent<Collider>());
+            // CreatePrimitive의 기본 재질은 빌드에서 셰이더가 빠져 분홍색이 된다
+            palletMat ??= Resources.Load<Material>("PalletBox");
+            go.GetComponent<Renderer>().sharedMaterial = palletMat;
             go.transform.SetParent(parent, false);
             go.transform.localPosition = pos;
             go.transform.localScale = scale;

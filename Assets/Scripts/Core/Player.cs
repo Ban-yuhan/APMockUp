@@ -328,7 +328,7 @@ namespace APC
                     return "이송 물품 대기 중";
                 }
                 case "dock":
-                    if (LoadableDock() == part.refObj) return "[E] 상차 미니게임";
+                    if (LoadableDock() == part.refObj) return "상차 버튼을 눌러 상차";
                     return S.HasKind(p, HandKind.Box) ? "이 도크 목적지 박스가 아닙니다" : "트럭 대기 중";
                 case "trash":
                     return "버릴 파손품 없음";

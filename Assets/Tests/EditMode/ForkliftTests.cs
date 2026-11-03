@@ -63,6 +63,9 @@ namespace APC.Tests
             // 트럭이 오면 탄 채로 미니게임: 파렛트 묶음이 목록에 나오고, 실으면 파렛트에서 빠지고, 빼면 파렛트로 돌아간다
             d.truck = LoadLogic.CreateTruck();
             d.truck.state = TruckState.Present;
+            // 묶음 모양이 어느 트럭 짐칸에든 들어가게 (짐칸 밖·잠긴 칸에는 놓이지 않는다)
+            d.truck.locked.Clear();
+            d.truck.w = d.truck.h = 6;
             Assert.IsNull(Forklifts.LoadableDock());   // 포크만 발판 위
             fl.z = pt.z;                                // 몸통을 발판 위로
             Assert.AreSame(d, Forklifts.LoadableDock());

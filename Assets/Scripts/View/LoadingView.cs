@@ -13,15 +13,19 @@ namespace APC
 {
     public class LoadingView : MonoBehaviour
     {
-        const float CS = 56;   // 칸 크기(px)
+        // 짐칸 위 운전석·아래 문 글자 자리 (px). 칸 크기는 GridFrame의 부모(GridArea)에 꽉 차게 트럭마다 다시 잰다
+        const float CabH = 34, DoorH = 30;
+        float CS = 64;
 
         [SerializeField] GameObject overlay;
-        [SerializeField] TMP_Text title, rate, rateNote, pay, left, listHeader, emptyHint;
+        [SerializeField] TMP_Text title, rate, rateNote, pay, listHeader, emptyHint;
         [SerializeField] Image barFill;
         [Tooltip("GridFrame(테두리) / Grid(칸 원점, 왼쪽 위) / Cells·Pieces·Preview")]
         [SerializeField] RectTransform gridFrame, grid, cellsRoot, piecesRoot, previewRoot;
         [SerializeField] RectTransform list, listViewport, ghost;
         [SerializeField] Button departBtn, resetBtn, closeBtn;
+        [Tooltip("마지막으로 놓은 박스를 돌린다")]
+        [SerializeField] Button rotateLeftBtn, rotateRightBtn;
         [Header("프리팹")]
         [SerializeField] Image cellPrefab, piecePrefab, miniPrefab;
         [SerializeField] RectTransform cardPrefab;
@@ -30,18 +34,21 @@ namespace APC
 
         Drag drag;
         Dock shown;
+        Placement selected;   // 회전 버튼 대상
         readonly List<(RectTransform rt, Box box)> cards = new List<(RectTransform, Box)>();
         // 지게차 묶음 칸: 칸 좌표로 색상을 밀어서 무지개가 대각선으로 흐른다
         readonly List<(Image img, Vector2Int c, float a)> rainbow = new List<(Image, Vector2Int, float)>();
 
-        static readonly string[] RANK_COLORS = { "#9e9e9e", "#8d6e63", "#43a047", "#1e88e5", "#8e24aa", "#f9a825" };
         const string SOFT = "#5b6775";
+        static readonly Color EDGE = new Color(0, 0, 0, .45f), BAD = new Color(.84f, .19f, .19f);
 
         void Awake()
         {
             departBtn.onClick.AddListener(Loading.Depart);
             resetBtn.onClick.AddListener(() => { Loading.ResetAll(); Render(); });
             closeBtn.onClick.AddListener(() => { CancelDrag(); Loading.Close(); });
+            rotateLeftBtn.onClick.AddListener(() => RotateSelected(false));
+            rotateRightBtn.onClick.AddListener(() => RotateSelected(true));
             overlay.SetActive(false);
             ghost.gameObject.SetActive(false);
         }
@@ -52,6 +59,7 @@ namespace APC
             if (Loading.dock != shown)
             {
                 CancelDrag();
+                selected = null;
                 shown = Loading.dock;
                 overlay.SetActive(shown != null);
                 if (shown != null) Render();
@@ -71,21 +79,25 @@ namespace APC
         // ---------- 입력 ----------
         void HandleInput()
         {
+            // 터치·마우스 공통은 Pointer. 모바일엔 마우스·키보드가 없다
+            var ptr = Pointer.current;
+            if (ptr == null) return;
             var m = Mouse.current;
             var k = Keyboard.current;
-            if (m == null || k == null) return;
-            var pos = m.position.ReadValue();
+            bool esc = k != null && k.escapeKey.wasPressedThisFrame;
+            bool r = m != null && m.rightButton.wasPressedThisFrame;
+            var pos = ptr.position.ReadValue();
             if (drag != null)
             {
                 // 드래그 중 R 또는 우클릭 = 회전
-                if (k.rKey.wasPressedThisFrame || m.rightButton.wasPressedThisFrame) Rotate();
-                if (k.escapeKey.wasPressedThisFrame) { CancelDrag(); Render(); return; }
+                if (r || k != null && k.rKey.wasPressedThisFrame) Rotate();
+                if (esc) { CancelDrag(); Render(); return; }
                 UpdateDrag(pos);
-                if (m.leftButton.wasReleasedThisFrame) EndDrag();
+                if (ptr.press.wasReleasedThisFrame) EndDrag();
                 return;
             }
-            if (k.escapeKey.wasPressedThisFrame) { Loading.Close(); return; }
-            bool l = m.leftButton.wasPressedThisFrame, r = m.rightButton.wasPressedThisFrame;
+            if (esc) { Loading.Close(); return; }
+            bool l = ptr.press.wasPressedThisFrame;
             if (!l && !r) return;
 
             var tr = shown.truck;
@@ -146,10 +158,34 @@ namespace APC
             if (key != drag.key) { drag.key = key; RenderPreview(); }
         }
 
+        // 짐칸 안에 다 들어가면 겹쳐도 일단 놓는다 (한도를 넘긴 겹침은 빨간 테두리, 출발 불가)
+        // 짐칸에 걸치기만 하면 놓지 않는다(원래 자리 그대로). 실은 박스를 짐칸 밖에 놓으면 뺀다
         void EndDrag()
         {
-            if (drag.valid && drag.target != null) Loading.Place(drag.box, drag.target, drag.placement);
+            var tr = shown.truck;
+            if (drag.target != null && LoadLogic.InTruck(tr, drag.target))
+            {
+                Loading.Place(drag.box, drag.target, drag.placement);
+                selected = tr.placements.LastOrDefault(p => p.box == drag.box);
+            }
+            else if (drag.target == null && drag.placement != null) Loading.Remove(drag.placement);
             CancelDrag();
+            Render();
+        }
+
+        // 왼쪽 위 칸을 기준으로 제자리에서 돌린다. 터치는 끄는 중에 버튼을 누를 수 없어서 놓은 뒤에 돌린다
+        // 오른쪽·아래 벽을 넘으면 안쪽으로 밀고, 그래도 잠긴 칸에 걸리면 돌리지 않는다
+        void RotateSelected(bool cw)
+        {
+            var tr = shown.truck;
+            if (selected == null || !tr.placements.Contains(selected)) return;
+            var min = new Vector2Int(selected.cells.Min(c => c.x), selected.cells.Min(c => c.y));
+            var cells = cw ? LoadLogic.Rotate(selected.cells) : LoadLogic.RotateCcw(selected.cells);
+            var size = new Vector2Int(cells.Max(c => c.x) + 1, cells.Max(c => c.y) + 1);
+            min = new Vector2Int(Mathf.Min(min.x, tr.w - size.x), Mathf.Min(min.y, tr.h - size.y));
+            var moved = cells.Select(c => c + min).ToList();
+            if (!LoadLogic.InTruck(tr, moved)) return;
+            Loading.Place(selected.box, moved, selected);
             Render();
         }
 
@@ -163,7 +199,7 @@ namespace APC
         // ---------- 렌더 ----------
         static Color BoxColor(Box b) => CONFIG.Type(b.primary).color;
         static string Hex(Color c) => "#" + ColorUtility.ToHtmlStringRGB(c);
-        static string Small(string s, int size = 11) => $"<size={size}><color={SOFT}>{s}</color></size>";
+        static string Small(string s, int size = 16) => $"<size={size}><color={SOFT}>{s}</color></size>";
         static string Emojis(Box b) => string.Concat(b.types.Select(t => CONFIG.Type(t).emoji));
 
         void Render()
@@ -181,38 +217,17 @@ namespace APC
             title.text = $"🚛 <b><color={Hex(dest.color)}>{dest.name}</color></b>행 · {tr.def.name} 트럭 ({tr.w}×{tr.h})";
             int r = U.Round(p.rate);
             string rc = r > L.maxRate ? "#8e24aa" : r >= 100 ? "#2e9e57" : "#1f2933";
-            rate.text = $"적재율 <size=20><b><color={rc}>{r}%</color></b></size> / 100%";
+            rate.text = $"적재율 <size=25><b><color={rc}>{r}%</color></b></size> / 100%";
             barFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01((float)(p.rate / L.maxRate)), 1);
             barFill.color = U.Hex(r > L.maxRate ? 0x8e24aa : 0x4caf50);
             string breakdown = p.objBonus > 0 ? $"칸 {U.Round(f.rate)}% + 목표 {p.objBonus}%p" : $"{f.filled}/{f.total}칸";
-            rateNote.text = Small($"({breakdown} · 가득 = {L.fullRate}%)", 12);
-            pay.text = $"예상 대금 <size=18><b><color=#b8860b>💰{U.Money(p.total)}</color></b></size> " +
-                       Small($"= 기본 {p.baseReward} × 적재 {p.fillMult:F2} × 랭크 {p.rankMult:F2}", 12);
+            rateNote.text = Small($"({breakdown} · 가득 = {L.fullRate}%)", 17);
+            pay.text = $"예상 대금 <size=23><b><color=#b8860b>💰{U.Money(p.total)}</color></b></size> " +
+                       Small($"= 기본 {p.baseReward} × 적재 {p.fillMult:F2} × 랭크 {p.rankMult:F2}", 17);
 
-            // 왼쪽: 특수 목표·랭크·배율·업그레이드
-            var sb = new System.Text.StringBuilder();
-            int doneN = p.objectives.Count(o => o.done);
-            sb.AppendLine($"<b>🎯 특수 목표</b> {Small($"{doneN}/{p.objectives.Count} 완료 · 적재율 +{p.objBonus}%p")}");
-            foreach (var o in p.objectives)
-                sb.AppendLine($"{(o.done ? "✅" : "⬜")} {LoadLogic.ObjectiveText(o.o)} {Small($"({o.now})")} <b><color={(o.done ? "#2e9e57" : "#b8860b")}>+{o.o.bonus}%p</color></b>");
-            if (p.objectives.Count == 0) sb.AppendLine(Small("목표 없음"));
-            sb.AppendLine(Small($"달성 보너스는 적재율에 더해지며 {L.maxRate}% 상한을 넘을 수 있습니다."));
-            sb.AppendLine().AppendLine("<b>타입 랭크</b>");
-            foreach (var ty in CONFIG.types)
-            {
-                var ri = p.ranks[ty.id];
-                string next = ri.rank < L.rankThresholds.Length ? $" (다음 {L.rankThresholds[ri.rank] - ri.count})" : "";
-                sb.AppendLine($"{ty.emoji} {ty.name}<pos=36%><b><color={RANK_COLORS[ri.rank]}>{L.rankNames[ri.rank]}</color></b>  {Small($"{ri.count}개{next}")}");
-            }
-            sb.AppendLine(Small($"혼합 박스는 들어간 타입마다 1개씩 셉니다. D 이상 1단계당 +{L.rankBonusPerStep * 100}%"));
-            sb.AppendLine().AppendLine("<b>적재 배율</b>");
-            string mults = string.Join(" · ", L.fillMult.AsEnumerable().Reverse().Select(m => $"{m.min}%↑ x{m.mult:F1}"));
-            sb.AppendLine(Small($"100% 미만 x0.5~1.0\n{mults}\n{L.maxRate}% 초과(목표 보너스) 1%p당 +{L.overPerPoint}"));
-            sb.AppendLine().AppendLine("<b>업그레이드</b>");
-            sb.Append(Small($"🗜️ 압축 적재 {f.overlap}/{G.loadCompress}칸\n⭐ 우선 적재 칸 {f.bonusCovered}/{tr.bonus.Count} (+{L.bonusCellPercent}%씩)"));
-            left.text = sb.ToString();
-
-            // 가운데: 짐칸
+            // 위: 짐칸 (GridArea 가로에 꽉 차게, 세로가 모자라면 세로에 맞춤)
+            var area = ((RectTransform)gridFrame.parent).rect;
+            CS = Mathf.Floor(Mathf.Min((area.width - 6) / tr.w, (area.height - CabH - DoorH - 6) / tr.h));
             gridFrame.sizeDelta = new Vector2(tr.w * CS + 6, tr.h * CS + 6);
             grid.sizeDelta = new Vector2(tr.w * CS, tr.h * CS);
             Clear(cellsRoot);
@@ -232,12 +247,14 @@ namespace APC
                     cell.GetComponentInChildren<TMP_Text>().text = locked ? "✖" : bonus ? "⭐" : "";
                 }
 
-            // 실린 박스: 칸마다 한 조각, 다른 칸과 맞닿지 않은 변에만 테두리
+            // 실린 박스: 칸마다 한 조각, 다른 칸과 맞닿지 않은 변에만 테두리. 놓을 수 없는 자리면 빨간 테두리
             Clear(piecesRoot);
+            var invalid = LoadLogic.Invalid(tr);
             foreach (var pl in tr.placements)
             {
                 var set = new HashSet<Vector2Int>(pl.cells);
                 bool dragging = drag != null && drag.placement == pl;
+                var edge = invalid.Contains(pl) ? BAD : EDGE;
                 for (int i = 0; i < pl.cells.Count; i++)
                 {
                     var c = pl.cells[i];
@@ -245,10 +262,12 @@ namespace APC
                     Place(piece.rectTransform, c.x, c.y, CS);
                     piece.color = WithA(BoxColor(pl.box), dragging ? 0.25f : 0.92f);
                     if (pl.box.parts != null) rainbow.Add((piece, c, piece.color.a));
-                    piece.transform.Find("Top").gameObject.SetActive(!set.Contains(c + Vector2Int.down));
-                    piece.transform.Find("Right").gameObject.SetActive(!set.Contains(c + Vector2Int.right));
-                    piece.transform.Find("Bottom").gameObject.SetActive(!set.Contains(c + Vector2Int.up));
-                    piece.transform.Find("Left").gameObject.SetActive(!set.Contains(c + Vector2Int.left));
+                    foreach (var (side, dir) in new[] { ("Top", Vector2Int.down), ("Right", Vector2Int.right), ("Bottom", Vector2Int.up), ("Left", Vector2Int.left) })
+                    {
+                        var e = piece.transform.Find(side);
+                        e.gameObject.SetActive(!set.Contains(c + dir));
+                        e.GetComponent<Image>().color = edge;
+                    }
                     piece.transform.Find("Label").GetComponent<TMP_Text>().text = i != 0 ? "" : pl.box.parts != null ? $"🌈×{pl.box.Count}" : Emojis(pl.box);
                     int n = occ[c];
                     var over = piece.transform.Find("Over").gameObject;
@@ -257,30 +276,30 @@ namespace APC
                 }
             }
 
-            // 오른쪽: 출고 대기 박스
+            // 아래: 출고 대기 박스 (가로 목록)
             var waiting = Loading.Waiting();
-            int bundled = waiting.Count(b => b.parts != null);
-            listHeader.text = $"<b>출고 대기 박스 ({waiting.Count - bundled})</b>" + (bundled > 0 ? $" <color=#8e24aa>🌈 파렛트 묶음 {bundled}</color>" : "");
+            // 파렛트 묶음도 한 개로 센다 (따로 표기하면 머리글이 길어져 칸 밖으로 나감)
+            listHeader.text = $"<b>출고 대기 박스 ({waiting.Count})</b>";
             emptyHint.gameObject.SetActive(waiting.Count == 0);
             Clear(list);
             cards.Clear();
-            // 묶음을 위로
+            // 묶음을 왼쪽으로. 카드: 위 블록 모양, 아래 번호·금액
             foreach (var b in waiting.OrderBy(b => b.parts == null))
             {
                 var card = Instantiate(cardPrefab, list);
                 var shape = (RectTransform)card.Find("Shape");
                 var size = MiniShape(shape, b);
                 var info = (RectTransform)card.Find("Info");
-                info.offsetMin = new Vector2(8 + size.x + 8, info.offsetMin.y);
-                string items = string.Join(" ", b.items.Select(kv => $"{CONFIG.items[kv.Key].emoji}x{kv.Value}"));
-                string head = b.parts != null ? $"<b>🌈 묶음 #{b.id}</b> 박스 {b.Count}개 · {b.cells.Count}칸" : $"<b>#{b.id}</b> {Emojis(b)} {b.cells.Count}칸";
-                string bonus = b.parts != null ? $" (묶음 x{L.bundleRewardMult:F1})" : "";
-                info.GetComponent<TMP_Text>().text = $"{head}\n{Small(items)}\n{Small("💰" + U.Money(b.reward) + bonus)}";
-                card.GetComponent<LayoutElement>().preferredHeight = Mathf.Max(size.y, 50) + 12;
+                info.offsetMax = new Vector2(info.offsetMax.x, -(8 + size.y + 4));
+                string head = b.parts != null ? $"<b>🌈 묶음 #{b.id}</b>\n박스 {b.Count}개" : $"<b>#{b.id}</b> {Emojis(b)}";
+                string bonus = b.parts != null ? $" x{L.bundleRewardMult:F1}" : "";
+                info.GetComponent<TMP_Text>().text = $"{head}\n{Small("💰" + U.Money(b.reward) + bonus, 14)}";
+                card.GetComponent<LayoutElement>().preferredWidth = Mathf.Max(size.x + 16, 110);
                 cards.Add((card, b));
             }
 
-            departBtn.interactable = tr.placements.Count > 0;
+            departBtn.interactable = tr.placements.Count > 0 && invalid.Count == 0;
+            rotateLeftBtn.interactable = rotateRightBtn.interactable = selected != null && tr.placements.Contains(selected);
             if (drag != null) { drag.key = null; RenderPreview(); }
         }
 
@@ -305,7 +324,7 @@ namespace APC
         }
 
         // 작은 블록 모양 (원본 miniShape). 크기를 돌려준다. 묶음이면 무지개
-        Vector2 MiniShape(RectTransform root, Box box, List<Vector2Int> cells = null, float size = 16)
+        Vector2 MiniShape(RectTransform root, Box box, List<Vector2Int> cells = null, float size = 20)
         {
             cells ??= box.cells;
             foreach (var c in cells)

@@ -34,6 +34,7 @@ namespace APC
 
         // 90도 시계 방향 (화면 좌표, y가 아래)
         public static List<Vector2Int> Rotate(IEnumerable<Vector2Int> cells) => Normalize(cells.Select(c => new Vector2Int(-c.y, c.x)));
+        public static List<Vector2Int> RotateCcw(IEnumerable<Vector2Int> cells) => Normalize(cells.Select(c => new Vector2Int(c.y, -c.x)));
 
         public static ShapeDef RandomShape(int units) => U.Pick(CONFIG.loading.Shapes(U.Clamp(units, 1, 5)));
 
@@ -74,14 +75,24 @@ namespace APC
         public static bool CanPlace(OutTruck truck, IEnumerable<Vector2Int> cells, Placement ignore = null)
         {
             var list = cells.ToList();
-            foreach (var c in list)
-            {
-                if (c.x < 0 || c.y < 0 || c.x >= truck.w || c.y >= truck.h) return false;
-                if (truck.locked.Contains(c)) return false;
-            }
+            if (list.Any(c => !Inside(truck, c))) return false;
             var occ = Occupancy(truck, ignore);
             foreach (var c in list) occ[c] = occ.TryGetValue(c, out int n) ? n + 1 : 1;
             return OverlapUsed(occ) <= G.loadCompress;
+        }
+
+        // 짐칸 안이고 잠기지 않은 칸
+        static bool Inside(OutTruck truck, Vector2Int c) => c.x >= 0 && c.y >= 0 && c.x < truck.w && c.y < truck.h && !truck.locked.Contains(c);
+
+        // 모든 칸이 짐칸 안(잠긴 칸 제외)이어야 놓을 수 있다. 겹침은 놓은 뒤 Invalid로 따진다
+        public static bool InTruck(OutTruck truck, IEnumerable<Vector2Int> cells) => cells.All(c => Inside(truck, c));
+
+        // 놓을 수 없는 자리에 둔 박스: 압축 적재 한도를 넘긴 겹친 칸에 걸친 것 (짐칸 밖에는 놓이지 않는다)
+        public static HashSet<Placement> Invalid(OutTruck truck)
+        {
+            var occ = Occupancy(truck);
+            bool over = OverlapUsed(occ) > G.loadCompress;
+            return new HashSet<Placement>(truck.placements.Where(p => p.cells.Any(c => !Inside(truck, c) || over && occ[c] > 1)));
         }
 
         // 적재율: 모든 칸을 다 채우면 fullRate(200%), ratio는 채운 칸 비율(0~1)
@@ -96,9 +107,10 @@ namespace APC
             }
             var occ = Occupancy(truck);
             int bonusCovered = truck.bonus.Count(k => occ.ContainsKey(k));
-            double ratio = (double)occ.Count / total;
+            int filled = occ.Keys.Count(k => Inside(truck, k));   // 놓을 수 없는 자리에 걸친 칸은 세지 않는다
+            double ratio = (double)filled / total;
             double rate = Math.Min(c.maxRate, ratio * c.fullRate + bonusCovered * c.bonusCellPercent);
-            return new FillInfo { filled = occ.Count, total = total, ratio = ratio, bonusCovered = bonusCovered, rate = rate, overlap = OverlapUsed(occ) };
+            return new FillInfo { filled = filled, total = total, ratio = ratio, bonusCovered = bonusCovered, rate = rate, overlap = OverlapUsed(occ) };
         }
 
         public static List<Box> LoadedBoxes(OutTruck truck) => truck.mode == "auto" ? truck.autoBoxes : truck.placements.Select(p => p.box).ToList();

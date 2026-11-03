@@ -15,6 +15,7 @@ namespace APC.EditorTools
     {
         const string PrefabDir = "Assets/Prefabs/UI";
         const string FontPath = "Assets/Fonts/malgun SDF.asset";
+        const float LdCS = 64;   // 상차 짐칸 한 칸 처음 크기. 실제 크기는 LoadingView가 트럭마다 GridArea에 맞춘다
         static TMP_FontAsset font;
 
         static readonly Color INK = U.Hex(0x1f2933), SOFT = U.Hex(0x5b6775), LINE = U.Hex(0xd5dbe3), BAR = U.Hex(0xf3f6fa);
@@ -42,9 +43,9 @@ namespace APC.EditorTools
             var canvasGo = new GameObject("UI", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvasGo.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
             var scaler = canvasGo.GetComponent<CanvasScaler>();
-            // 원본 패널은 1180×720, 최대 96vw × 94vh. 화면이 작으면 패널이 화면 안에 들어오게 줄인다
+            // 모바일 세로 기준 720×1280. Expand라 캔버스는 항상 이보다 크거나 같아서 기준 크기에 맞춘 UI는 잘리지 않는다
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1230, 766);
+            scaler.referenceResolution = new Vector2(720, 1280);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
             if (!Object.FindFirstObjectByType<EventSystem>())
                 new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
@@ -54,10 +55,14 @@ namespace APC.EditorTools
             Stretch(labels);
             var lv = labels.gameObject.AddComponent<LabelView>();
             SetRefs(lv, ("cam", Camera.main), ("labelPrefab", worldLabel));
-            var hud = Rect("Hud", canvasGo.transform);
+            // HUD·패널·디버그는 안전 영역(노치·홈 바 제외) 안에 둔다. 월드 라벨과 상차 패널(어두운 배경)은 화면 전체
+            var safe = Rect("Safe", canvasGo.transform);
+            Stretch(safe);
+            safe.gameObject.AddComponent<SafeArea>();
+            var hud = Rect("Hud", safe);
             Stretch(hud);
-            var panel = BuildPanel(canvasGo.transform, panelText, panelRow, albaRow);
-            var debug = BuildDebug(canvasGo.transform, panel);
+            var panel = BuildPanel(safe, panelText, panelRow, albaRow);
+            var debug = BuildDebug(safe, panel);
             BuildHud(hud, panel, debug, orderCard, toast, snack);
             BuildLoading(canvasGo.transform, cell, piece, mini, card);
 
@@ -89,13 +94,13 @@ namespace APC.EditorTools
             var br = banner.rectTransform;
             br.anchorMin = br.anchorMax = new Vector2(0.5f, 1);
             br.pivot = new Vector2(0.5f, 1);
-            br.anchoredPosition = new Vector2(0, -98);
+            br.anchoredPosition = new Vector2(0, -130);
             var hbn = banner.gameObject.AddComponent<HorizontalLayoutGroup>();
             hbn.padding = new RectOffset(16, 16, 6, 6);
             hbn.childControlWidth = hbn.childControlHeight = true;
             hbn.childForceExpandWidth = hbn.childForceExpandHeight = false;
             Fit(banner.gameObject);
-            var eventText = Text("Text", br, 14);
+            var eventText = Text("Text", br, 19);
             eventText.color = Color.white;
             banner.gameObject.SetActive(false);
             SetRefs(view, ("debug", debug), ("eventBanner", br), ("eventText", eventText));
@@ -103,53 +108,54 @@ namespace APC.EditorTools
             // 좌상단 시계
             var clock = Img("ClockBox", hud, PANEL).rectTransform;
             Corner(clock, new Vector2(0, 1), new Vector2(10, -10));
-            clock.sizeDelta = new Vector2(200, 0);
+            clock.sizeDelta = new Vector2(280, 0);
             var v = VLayout(clock.gameObject, new RectOffset(12, 12, 10, 10), 4);
             clock.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             var line = Rect("Clock", clock);
-            Layout(line.gameObject, 0, 22);
-            var day = Text("Day", line, 15);
+            Layout(line.gameObject, 0, 30);
+            var day = Text("Day", line, 20);
             Stretch(day.rectTransform);
-            var time = Text("Time", line, 15);
+            var time = Text("Time", line, 20);
             Stretch(time.rectTransform);
             time.alignment = TextAlignmentOptions.MidlineRight;
             var phase = Img("PhaseBar", clock, U.Hex(0xe3e8ee));
-            Layout(phase.gameObject, 0, 4);
+            Layout(phase.gameObject, 0, 6);
             var phaseFill = Img("Fill", phase.transform, U.Hex(0xe6a100));
             Stretch(phaseFill.rectTransform);
-            var money = Text("Money", clock, 20);
+            var money = Text("Money", clock, 26);
             money.fontStyle = FontStyles.Bold;
-            Layout(money.gameObject, 0, 28);
+            Layout(money.gameObject, 0, 36);
             var speed = Rect("Speed", clock);
-            Layout(speed.gameObject, 0, 22);
+            Layout(speed.gameObject, 0, 40);
             var hs = speed.gameObject.AddComponent<HorizontalLayoutGroup>();
             hs.spacing = 4;
             hs.childControlWidth = hs.childControlHeight = true;
             hs.childForceExpandWidth = hs.childForceExpandHeight = true;
-            var speeds = new[] { "⏸", "x1", "x2", "x4" }.Select(s => SmallBtn(s, speed, 12, Color.white, INK)).ToArray();
-            var stats = Text("Stats", clock, 11);
+            var speeds = new[] { "⏸", "x1", "x2", "x4" }.Select(s => SmallBtn(s, speed, 18, Color.white, INK)).ToArray();
+            var stats = Text("Stats", clock, 15);
             stats.color = SOFT;
-            Layout(stats.gameObject, 0, 16);
+            Layout(stats.gameObject, 0, 22);
 
             // 상단 주문서
             var strip = Rect("OrderStrip", hud);
             strip.anchorMin = new Vector2(0, 1); strip.anchorMax = new Vector2(1, 1); strip.pivot = new Vector2(0, 1);
-            strip.offsetMin = new Vector2(220, -10 - 82);
-            strip.offsetMax = new Vector2(-90, -10);
+            strip.offsetMin = new Vector2(300, -10 - 110);
+            strip.offsetMax = new Vector2(-10, -10);
             var hl = strip.gameObject.AddComponent<HorizontalLayoutGroup>();
             hl.spacing = 6;
             hl.childControlWidth = hl.childControlHeight = true;
             hl.childForceExpandWidth = false; hl.childForceExpandHeight = true;
             strip.gameObject.AddComponent<RectMask2D>();
 
-            // 하단 메뉴
+            // 하단 가운데 메뉴 (패널 여는 버튼). 모바일 터치용 40pt 글자라 한 줄에 다 안 들어가서 2×2
             var menu = Rect("MenuBar", hud);
-            Corner(menu, Vector2.zero, new Vector2(10, 10));
-            var hm = menu.gameObject.AddComponent<HorizontalLayoutGroup>();
-            hm.spacing = 6;
-            hm.childControlWidth = hm.childControlHeight = true;
-            hm.childForceExpandWidth = hm.childForceExpandHeight = false;
-            Fit(menu.gameObject);
+            Corner(menu, new Vector2(0.5f, 0), new Vector2(0, 10));
+            menu.sizeDelta = new Vector2(688, MenuH);
+            var gm = menu.gameObject.AddComponent<GridLayoutGroup>();
+            gm.cellSize = new Vector2(340, 84);
+            gm.spacing = new Vector2(8, 8);
+            gm.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            gm.constraintCount = 2;
             var facility = MenuBtn("🏗️ 시설", menu);
             var upgrade = MenuBtn("⬆️ 업그레이드", menu);
             var albaBtn = MenuBtn("👷 알바", menu);
@@ -160,13 +166,13 @@ namespace APC.EditorTools
 
             // 우측 간식 바 (간식 칸은 SnackView가 설정 수만큼 만든다)
             var bar = Img("SnackBar", hud, PANEL).rectTransform;
-            Corner(bar, Vector2.one, new Vector2(-10, -100));
-            bar.sizeDelta = new Vector2(66, 0);
+            Corner(bar, Vector2.one, new Vector2(-10, -130));
+            bar.sizeDelta = new Vector2(90, 0);
             var vb = VLayout(bar.gameObject, new RectOffset(6, 6, 8, 8), 6);
             vb.childAlignment = TextAnchor.UpperCenter;
             vb.childForceExpandWidth = false;
             bar.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var title = Text("Title", bar, 11);
+            var title = Text("Title", bar, 15);
             title.fontStyle = FontStyles.Bold;
             title.color = SOFT;
             title.alignment = TextAlignmentOptions.Center;
@@ -177,30 +183,20 @@ namespace APC.EditorTools
             ghost.alignment = TextAlignmentOptions.Center;
             SetRefs(bar.gameObject.AddComponent<SnackView>(), ("cam", Camera.main), ("panel", panel), ("snackPrefab", snack), ("ghost", ghost));
 
-            // 하단 도움말 (원본: 왼쪽 끝이 화면 가운데에서 자기 폭의 30%만큼 왼쪽)
-            var helpBg = Img("Help", hud, new Color(1, 1, 1, .75f));
-            helpBg.raycastTarget = false;
-            var hr = helpBg.rectTransform;
-            hr.anchorMin = hr.anchorMax = new Vector2(0.5f, 0);
-            hr.pivot = new Vector2(0.3f, 0);
-            hr.anchoredPosition = new Vector2(0, 14);
-            var hh = helpBg.gameObject.AddComponent<HorizontalLayoutGroup>();
-            hh.padding = new RectOffset(10, 10, 4, 4);
-            hh.childControlWidth = hh.childControlHeight = true;
-            hh.childForceExpandWidth = hh.childForceExpandHeight = false;
-            Fit(helpBg.gameObject);
-            var help = Text("Text", hr, 12);
-            help.color = SOFT;
+            float fy = 10 + MenuH + 10;
+            BuildForkliftButton(hud, false, fy);                     // 소환/해제
+            BuildForkliftButton(hud, true, fy + FlBtn.y + 10);       // 탑승/하차 (그 위)
+            BuildLoadButton(hud, fy + (FlBtn.y + 10) * 2);           // 상차하기 (그 위)
 
-            // 우하단 토스트 (새 토스트가 아래)
+            // 메뉴 바로 위 가운데 토스트 (새 토스트가 아래)
             var toasts = Rect("Toasts", hud);
-            Corner(toasts, new Vector2(1, 0), new Vector2(-90, 44));
+            Corner(toasts, new Vector2(0.5f, 0), new Vector2(0, fy));
             var vt = VLayout(toasts.gameObject, new RectOffset(), 6);
-            vt.childAlignment = TextAnchor.LowerRight;
+            vt.childAlignment = TextAnchor.LowerCenter;
             Fit(toasts.gameObject);
 
-            SetRefs(view, ("clockDay", day), ("clockTime", time), ("money", money), ("stats", stats), ("help", help),
-                ("phaseFill", phaseFill), ("helpBg", helpBg), ("facilityBtn", facility), ("upgradeBtn", upgrade), ("albaBtn", albaBtn), ("panel", panel),
+            SetRefs(view, ("clockDay", day), ("clockTime", time), ("money", money), ("stats", stats),
+                ("phaseFill", phaseFill), ("facilityBtn", facility), ("upgradeBtn", upgrade), ("albaBtn", albaBtn), ("panel", panel),
                 ("orderStrip", strip), ("toasts", toasts), ("orderCardPrefab", orderCard), ("toastPrefab", toast));
             var so = new SerializedObject(view);
             var arr = so.FindProperty("speedBtns");
@@ -209,42 +205,178 @@ namespace APC.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        // ---------- 왼쪽 패널 ----------
+        // 오른쪽 아래(메뉴·토스트 위) 지게차 버튼: 흰 칸에 지게차 그림, 아래 색 띠에 상태. ride: 탑승/하차, 아니면 소환/해제
+        const string ForkliftIconPath = "Assets/Sprites/ForkliftIcon.png";
+        const float MenuH = 84 * 2 + 8;
+        static readonly Vector2 FlBtn = new Vector2(150, 136);
+
+        // 상차 버튼: 지게차 버튼과 같은 크기, 눈에 띄는 노란색. 상차할 수 있는 도크 위에서만 보인다
+        static void BuildLoadButton(RectTransform hud, float y)
+        {
+            var holder = Rect("LoadButton", hud);
+            Corner(holder, new Vector2(1, 0), new Vector2(-10, y));
+            holder.sizeDelta = FlBtn;
+            var view = holder.gameObject.AddComponent<LoadButtonView>();
+            var bg = Img("Btn", holder, U.Hex(0xffca28));
+            Stretch(bg.rectTransform);
+            bg.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            bg.type = Image.Type.Sliced;
+            var btn = bg.gameObject.AddComponent<Button>();
+            var o = bg.gameObject.AddComponent<Outline>();
+            o.effectColor = new Color(0, 0, 0, .35f); o.effectDistance = new Vector2(2, -2);
+            var label = Text("Label", bg.transform, 30);
+            Stretch(label.rectTransform);
+            label.margin = new Vector4(6, 6, 6, 6);
+            label.alignment = TextAlignmentOptions.Center;
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 18; label.fontSizeMax = 30;
+            label.text = "<b>상차하기</b>\n(목적지)";
+            SetRefs(view, ("btn", btn), ("label", label));
+        }
+
+        static void BuildForkliftButton(RectTransform hud, bool ride, float y)
+        {
+            var imp = (TextureImporter)AssetImporter.GetAtPath(ForkliftIconPath);
+            if (imp && imp.textureType != TextureImporterType.Sprite)
+            {
+                imp.textureType = TextureImporterType.Sprite;
+                imp.spriteImportMode = SpriteImportMode.Single;
+                imp.SaveAndReimport();
+            }
+            // 버튼을 숨겨도 상태 판정은 계속 돌아야 해서 뷰는 바깥 칸에 단다
+            var holder = Rect(ride ? "ForkliftRide" : "ForkliftSummon", hud);
+            Corner(holder, new Vector2(1, 0), new Vector2(-10, y));
+            holder.sizeDelta = FlBtn;
+            var view = holder.gameObject.AddComponent<ForkliftButtonView>();
+            var bg = Img("Btn", holder, Color.white);
+            Stretch(bg.rectTransform);
+            bg.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            bg.type = Image.Type.Sliced;
+            var btn = bg.gameObject.AddComponent<Button>();
+            bg.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, .25f);
+            var icon = Img("Icon", bg.transform, Color.white);
+            icon.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(ForkliftIconPath);
+            icon.preserveAspect = true;
+            icon.raycastTarget = false;
+            Stretch(icon.rectTransform);
+            icon.rectTransform.offsetMin = new Vector2(4, 40);
+            icon.rectTransform.offsetMax = new Vector2(-4, -2);
+            var state = Img("State", bg.transform, U.Hex(0x1e5aa8));
+            state.raycastTarget = false;
+            Band(state.rectTransform, false, 38);
+            var label = Text("Label", state.transform, 22);
+            Stretch(label.rectTransform);
+            label.alignment = TextAlignmentOptions.Center;
+            label.color = Color.white;
+            SetRefs(view, ("btn", btn), ("stateBg", state), ("label", label));
+            var so = new SerializedObject(view);
+            so.FindProperty("ride").boolValue = ride;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        // ---------- 가운데 패널 ----------
+        // 패널 글자 크기 (기준 720×1280 세로). 알바 패널은 PanelView의 같은 이름 값
+        const float PTitle = 34, PHead = 28, PBody = 24;
+
+        // 시설·업그레이드 내용은 여기서 Hierarchy에 미리 놓는다 (런타임은 값·버튼·SetActive만). 알바 내용은 런타임에 프리팹으로 만든다
         static PanelView BuildPanel(Transform canvas, TMP_Text text, RectTransform row, RectTransform albaRow)
         {
+            var cfg = AssetDatabase.LoadAssetAtPath<ApcConfig>("Assets/Data/ApcConfig.asset");
             var holder = Rect("Panel", canvas);
             Stretch(holder);
             var view = holder.gameObject.AddComponent<PanelView>();
             var root = Img("Box", holder, PANEL).rectTransform;
-            root.anchorMin = new Vector2(0, 0); root.anchorMax = new Vector2(0, 1); root.pivot = new Vector2(0, 1);
-            root.offsetMin = new Vector2(10, 56);
-            root.offsetMax = new Vector2(10 + 400, -100);
+            Center(root);
             var viewport = Rect("Viewport", root);
             Stretch(viewport);
             viewport.offsetMin = new Vector2(16, 14);
             viewport.offsetMax = new Vector2(-16, -14);
             viewport.gameObject.AddComponent<RectMask2D>();
-            var content = Rect("Content", viewport);
-            content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1); content.pivot = new Vector2(0.5f, 1);
-            content.sizeDelta = Vector2.zero;
-            VLayout(content.gameObject, new RectOffset(0, 0, 0, 0), 4);
-            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            RectTransform Content(string name)
+            {
+                var c = Rect(name, viewport);
+                c.anchorMin = new Vector2(0, 1); c.anchorMax = new Vector2(1, 1); c.pivot = new Vector2(0.5f, 1);
+                c.sizeDelta = Vector2.zero;
+                VLayout(c.gameObject, new RectOffset(0, 0, 0, 0), 4);
+                c.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                c.gameObject.SetActive(false);
+                return c;
+            }
+            var facility = Content("Facility");
+            var upgrade = Content("Upgrade");
+            var alba = Content("Alba");
             var scroll = root.gameObject.AddComponent<ScrollRect>();
-            scroll.viewport = viewport; scroll.content = content;
+            scroll.viewport = viewport; scroll.content = facility;
             scroll.horizontal = false;
             scroll.movementType = ScrollRect.MovementType.Clamped;
             scroll.scrollSensitivity = 30;
             var close = Img("Close", root, Color.clear);
             close.rectTransform.anchorMin = close.rectTransform.anchorMax = close.rectTransform.pivot = Vector2.one;
-            close.rectTransform.anchoredPosition = new Vector2(-6, -6);
-            close.rectTransform.sizeDelta = new Vector2(28, 28);
+            close.rectTransform.anchoredPosition = new Vector2(-4, -4);
+            close.rectTransform.sizeDelta = new Vector2(56, 56);
             var closeBtn = close.gameObject.AddComponent<Button>();
-            var ct = Text("Label", close.transform, 18);
+            var ct = Text("Label", close.transform, 32);
             Stretch(ct.rectTransform);
             ct.alignment = TextAlignmentOptions.Center;
-            ct.color = SOFT;
+            ct.color = INK;
             ct.text = "✕";
-            SetRefs(view, ("root", root.gameObject), ("content", content), ("closeBtn", closeBtn), ("textPrefab", text), ("rowPrefab", row), ("albaRowPrefab", albaRow));
+
+            // 글자·줄은 프리팹 인스턴스라 Hierarchy에서 바로 고칠 수 있다
+            void P(Transform parent, string s, float size)
+            {
+                var t = (TMP_Text)PrefabUtility.InstantiatePrefab(text, parent);
+                bool heading = size > PBody;
+                t.fontSize = size;
+                t.text = heading ? $"<b>{s}</b>" : s;
+                t.color = heading ? INK : SOFT;
+                // 원본 h3 위 여백
+                if (size == PHead) t.margin = new Vector4(0, 16, 0, 0);
+            }
+            void R(Transform parent, string act, string arg, string label = "")
+            {
+                var r = (RectTransform)PrefabUtility.InstantiatePrefab(row, parent);
+                r.name = arg == null ? act : $"{act} {arg}";
+                r.Find("Label").GetComponent<TMP_Text>().text = label;
+                var da = r.gameObject.AddComponent<DebugAction>();
+                da.act = act; da.arg = arg;
+            }
+
+            P(facility, "🏗️ 시설", PTitle);
+            P(facility, "보관함 (품목)", PHead);
+            for (int i = 0; i < cfg.items.Count; i++)
+            {
+                var it = cfg.items[i];
+                var ty = cfg.Type(it.type);
+                R(facility, "bin", i.ToString(), $"{it.emoji} {it.name} {Rich.Small($"{ty.emoji}{ty.name} · 가격 {it.price}")}");
+            }
+            P(facility, "포장대", PHead);
+            var map = Object.FindFirstObjectByType<MapRoot>();
+            int tables = map ? map.Points(PointKind.Table).Count : 0;
+            for (int i = 0; i < tables; i++) R(facility, "table", i.ToString(), $"🎁 포장대 {i + 1}");
+            P(facility, "출고 도크 (목적지)", PHead);
+            for (int i = 0; i < cfg.destinations.Count; i++)
+            {
+                var dest = cfg.destinations[i];
+                R(facility, "dock", i.ToString(), $"<color={Rich.Hex(dest.color)}>🏁 {dest.name}</color>");
+            }
+            P(facility, "케어시설", PHead);
+            R(facility, "rest", null);
+            R(facility, "purifier", null);
+
+            P(upgrade, "⬆️ 업그레이드", PTitle);
+            P(upgrade, "공정", PHead);
+            P(upgrade, "Lv1~3: 알바 배치 슬롯 1~3명 · Lv4: 자동화 (하차는 자동화 없음)", PBody);
+            foreach (var s in cfg.stages) R(upgrade, "stage", s.id);
+            P(upgrade, "물류 시설", PHead);
+            foreach (var key in FacilityCfg.Keys) R(upgrade, "fac", key);
+            P(upgrade, "보관함 + 하차장 + 운송 중인 물품의 합이 최대 보관량에 닿은 품목(⛔)은 더 이상 배송되지 않습니다.", PBody);
+            P(upgrade, "상차 미니게임", PHead);
+            R(upgrade, "load", "compress");
+            R(upgrade, "load", "bonus");
+            P(upgrade, "알바/자동화 상차는 고정 적재율이라 미니게임 업그레이드가 적용되지 않습니다.", PBody);
+
+            SetRefs(view, ("root", root.gameObject), ("scroll", scroll), ("facility", facility), ("upgrade", upgrade), ("alba", alba), ("closeBtn", closeBtn),
+                ("textPrefab", text), ("rowPrefab", row), ("albaRowPrefab", albaRow));
             return view;
         }
 
@@ -253,7 +385,7 @@ namespace APC.EditorTools
         {
             var root = Img("AlbaRow", null, U.Hex(0xf5f7fa));
             VLayout(root.gameObject, new RectOffset(8, 8, 8, 8), 4);
-            var info = Text("Info", root.transform, 12);
+            var info = Text("Info", root.transform, PBody);
             info.textWrappingMode = TextWrappingModes.Normal;
             info.alignment = TextAlignmentOptions.TopLeft;
             var bottom = Rect("Bottom", root.transform);
@@ -263,17 +395,17 @@ namespace APC.EditorTools
             h.childControlWidth = h.childControlHeight = true;
             h.childForceExpandWidth = h.childForceExpandHeight = false;
 
-            var dd = Dropdown("Assign", bottom, 170);
+            var dd = Dropdown("Assign", bottom, 240);
 
-            var status = Text("Status", bottom, 12);
+            var status = Text("Status", bottom, 22);
             status.color = SOFT;
             status.overflowMode = TextOverflowModes.Ellipsis;
             var le = status.gameObject.AddComponent<LayoutElement>();
             le.preferredWidth = 1; le.flexibleWidth = 1;
-            var fire = SmallBtn("해고", bottom, 12, Color.white, U.Hex(0xd63031));
+            var fire = SmallBtn("해고", bottom, PBody, Color.white, U.Hex(0xd63031));
             fire.name = "Fire";
             var hf = fire.gameObject.AddComponent<HorizontalLayoutGroup>();
-            hf.padding = new RectOffset(8, 8, 2, 2);
+            hf.padding = new RectOffset(16, 16, 14, 14);
             hf.childControlWidth = hf.childControlHeight = true;
             hf.childForceExpandWidth = hf.childForceExpandHeight = false;
             return root.gameObject;
@@ -295,9 +427,15 @@ namespace APC.EditorTools
             var dd = TMP_DefaultControls.CreateDropdown(UiRes());
             dd.name = name;
             dd.transform.SetParent(parent, false);
-            Layout(dd, width, 24);
-            foreach (var t in dd.GetComponentsInChildren<TMP_Text>(true)) { t.font = font; t.fontSize = 12; }
-            dd.GetComponent<TMP_Dropdown>().template.sizeDelta = new Vector2(0, 230);
+            Layout(dd, width, 56);
+            foreach (var t in dd.GetComponentsInChildren<TMP_Text>(true)) { t.font = font; t.fontSize = PBody; }
+            var template = dd.GetComponent<TMP_Dropdown>().template;
+            template.sizeDelta = new Vector2(0, 400);
+            // 기본 항목 높이(20)는 24pt 글자에 작아서 터치하기 쉽게 키운다
+            var item = (RectTransform)template.Find("Viewport/Content/Item");
+            item.sizeDelta = new Vector2(item.sizeDelta.x, 56);
+            var list = (RectTransform)item.parent;
+            list.sizeDelta = new Vector2(list.sizeDelta.x, 56);
             return dd;
         }
 
@@ -306,8 +444,8 @@ namespace APC.EditorTools
             var go = TMP_DefaultControls.CreateInputField(UiRes());
             go.name = name;
             go.transform.SetParent(parent, false);
-            Layout(go, width, 24);
-            foreach (var t in go.GetComponentsInChildren<TMP_Text>(true)) { t.font = font; t.fontSize = 12; }
+            Layout(go, width, 56);
+            foreach (var t in go.GetComponentsInChildren<TMP_Text>(true)) { t.font = font; t.fontSize = PBody; }
             var f = go.GetComponent<TMP_InputField>();
             f.contentType = TMP_InputField.ContentType.IntegerNumber;
             f.placeholder.GetComponent<TMP_Text>().text = "";
@@ -323,9 +461,7 @@ namespace APC.EditorTools
             Stretch(holder);
             var view = holder.gameObject.AddComponent<DebugView>();
             var box = Img("Box", holder, U.Hex(0xfffdf3)).rectTransform;
-            box.anchorMin = new Vector2(1, 0); box.anchorMax = Vector2.one; box.pivot = Vector2.one;
-            box.offsetMin = new Vector2(-86 - 280, 230);
-            box.offsetMax = new Vector2(-86, -100);
+            Center(box);
             var outline = box.gameObject.AddComponent<Outline>();
             outline.effectColor = gold; outline.effectDistance = new Vector2(2, -2);
             var viewport = Rect("Viewport", box);
@@ -352,15 +488,19 @@ namespace APC.EditorTools
                 t.text = bold ? $"<b>{s}</b>" : s;
                 return t;
             }
-            void H3(string s) { var t = Label(s, 12, SOFT, null, true); t.margin = new Vector4(0, 6, 0, 0); }
+            void H3(string s) { var t = Label(s, PHead, SOFT, null, true); t.margin = new Vector4(0, 16, 0, 0); }
             Button Act(Transform parent, string label, string act, string arg = null)
             {
-                var b = SmallBtn(label, parent, 12, btnBg, INK);
+                var b = SmallBtn(label, parent, PBody, btnBg, INK);
                 b.name = act;
                 var h = b.gameObject.AddComponent<HorizontalLayoutGroup>();
-                h.padding = new RectOffset(8, 8, 4, 4);
+                h.padding = new RectOffset(12, 12, 14, 14);
                 h.childControlWidth = h.childControlHeight = true;
                 h.childForceExpandWidth = h.childForceExpandHeight = false;
+                // 한 줄에 다 안 들어가는 버튼이 많다: 줄 폭을 나눠 갖고 글자는 줄바꿈
+                var le = b.gameObject.AddComponent<LayoutElement>();
+                le.preferredWidth = 1; le.flexibleWidth = 1;
+                b.GetComponentInChildren<TMP_Text>().textWrappingMode = TextWrappingModes.Normal;
                 var o = b.gameObject.AddComponent<Outline>();
                 o.effectColor = U.Hex(0xd9c27a);
                 var da = b.gameObject.AddComponent<DebugAction>();
@@ -371,7 +511,7 @@ namespace APC.EditorTools
             {
                 var r = Rect("Row", content);
                 var h = r.gameObject.AddComponent<HorizontalLayoutGroup>();
-                h.spacing = 4;
+                h.spacing = 8;
                 h.childControlWidth = h.childControlHeight = true;
                 h.childForceExpandWidth = h.childForceExpandHeight = false;
                 foreach (var b in btns) Act(r, b.label, b.act, b.arg);
@@ -381,21 +521,21 @@ namespace APC.EditorTools
             var close = Img("Close", box, Color.clear);
             close.rectTransform.anchorMin = close.rectTransform.anchorMax = close.rectTransform.pivot = Vector2.one;
             close.rectTransform.anchoredPosition = new Vector2(-4, -4);
-            close.rectTransform.sizeDelta = new Vector2(24, 24);
+            close.rectTransform.sizeDelta = new Vector2(56, 56);
             close.gameObject.AddComponent<Button>();
             close.gameObject.AddComponent<DebugAction>().act = "close";
-            var ct = Text("Label", close.transform, 16);
+            var ct = Text("Label", close.transform, 32);
             Stretch(ct.rectTransform);
             ct.alignment = TextAlignmentOptions.Center;
-            ct.color = SOFT;
+            ct.color = INK;
             ct.text = "✕";
 
-            Label("🛠️ 디버그", 15, ink, null, true);
-            var state = Label("", 12, SOFT);
+            Label("🛠️ 디버그", PTitle, ink, null, true);
+            var state = Label("", PBody, SOFT);
             int step = cfg.debug.moneyStep;
             H3($"💰 돈 ({step:N0}원 단위)");
             var moneyRow = Row();
-            var money = Input("MoneyInput", moneyRow, 100);
+            var money = Input("MoneyInput", moneyRow, 200);
             money.transform.SetAsFirstSibling();
             Act(moneyRow, "+ 추가", "money-add");
             Act(moneyRow, "- 차감", "money-sub");
@@ -414,13 +554,13 @@ namespace APC.EditorTools
             Row(("MT 전원 100", "mt", "100"), ("MT 전원 -60", "mt", "-60"), ("지원자 새로고침", "reroll", null));
 
             H3("🧑‍🔧 알바 스탯 편집");
-            var empty = Label("고용한 알바가 없습니다", 12, SOFT);
+            var empty = Label("고용한 알바가 없습니다", PBody, SOFT);
             var albaBox = Rect("AlbaBox", content);
             VLayout(albaBox.gameObject, new RectOffset(), 4);
             var select = Dropdown("AlbaSelect", albaBox, 0).GetComponent<TMP_Dropdown>();
             var grid = Rect("Grid", albaBox);
             var gl = grid.gameObject.AddComponent<GridLayoutGroup>();
-            gl.cellSize = new Vector2(82, 40);
+            gl.cellSize = new Vector2(205, 84);
             gl.spacing = new Vector2(4, 4);
             gl.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             gl.constraintCount = 3;
@@ -429,7 +569,7 @@ namespace APC.EditorTools
             {
                 var cell = Rect(key, grid);
                 VLayout(cell.gameObject, new RectOffset(), 1);
-                Label(label, 11, SOFT, cell);
+                Label(label, 22, SOFT, cell);
                 var f = Input("Input", cell, 0);
                 var da = f.gameObject.AddComponent<DebugAction>();
                 da.act = "af"; da.arg = key;
@@ -438,7 +578,7 @@ namespace APC.EditorTools
             var unpaidRow = Row(("미지급: 아니오", "unpaid", null));
             unpaidRow.SetParent(albaBox, false);
             var unpaid = unpaidRow.GetComponentInChildren<Button>();
-            var effects = Label("", 12, INK, albaBox);
+            var effects = Label("", PBody, INK, albaBox);
             Row(("이 스탯·숙련도를 모든 알바에 적용", "alba-copy", null)).SetParent(albaBox, false);
             H3("🏗️ 시설");
             Row(("모든 시설 해금 (무료)", "unlock-all", null));
@@ -452,8 +592,8 @@ namespace APC.EditorTools
         static GameObject SnackPrefab()
         {
             var root = Img("Snack", null, U.Hex(0xfff7e6));
-            Layout(root.gameObject, 50, 50);
-            var t = Text("Text", root.transform, 24);
+            Layout(root.gameObject, 70, 70);
+            var t = Text("Text", root.transform, 32);
             Stretch(t.rectTransform);
             t.alignment = TextAlignmentOptions.Center;
             t.lineSpacing = -20;
@@ -466,11 +606,11 @@ namespace APC.EditorTools
         {
             var root = Img("OrderCard", null, PANEL);
             root.raycastTarget = false;
-            root.gameObject.AddComponent<LayoutElement>().preferredWidth = 132;
+            root.gameObject.AddComponent<LayoutElement>().preferredWidth = 170;
             var top = Img("Top", root.transform, Color.gray);
             top.raycastTarget = false;
             Band(top.rectTransform, true, 4);
-            var t = Text("Text", root.transform, 12);
+            var t = Text("Text", root.transform, 16);
             Stretch(t.rectTransform);
             t.rectTransform.offsetMin = new Vector2(7, 4);
             t.rectTransform.offsetMax = new Vector2(-7, -8);
@@ -490,14 +630,14 @@ namespace APC.EditorTools
             h.padding = new RectOffset(12, 12, 7, 7);
             h.childControlWidth = h.childControlHeight = true;
             h.childForceExpandWidth = h.childForceExpandHeight = false;
-            var t = Text("Text", root.transform, 13);
+            var t = Text("Text", root.transform, 18);
             t.color = Color.white;
             return root.gameObject;
         }
 
         static GameObject PanelTextPrefab()
         {
-            var t = Text("PanelText", null, 12);
+            var t = Text("PanelText", null, PBody);
             t.textWrappingMode = TextWrappingModes.Normal;
             t.alignment = TextAlignmentOptions.TopLeft;
             return t.gameObject;
@@ -509,23 +649,23 @@ namespace APC.EditorTools
             var root = Img("PanelRow", null, U.Hex(0xf5f7fa));
             root.raycastTarget = false;
             var h = root.gameObject.AddComponent<HorizontalLayoutGroup>();
-            h.padding = new RectOffset(8, 8, 6, 6);
+            h.padding = new RectOffset(12, 12, 10, 10);
             h.spacing = 8;
             h.childAlignment = TextAnchor.MiddleLeft;
             h.childControlWidth = h.childControlHeight = true;
             h.childForceExpandWidth = h.childForceExpandHeight = false;
-            var label = Text("Label", root.transform, 13);
+            var label = Text("Label", root.transform, 26);
             label.textWrappingMode = TextWrappingModes.Normal;
             var le = label.gameObject.AddComponent<LayoutElement>();
             le.preferredWidth = 1; le.flexibleWidth = 1;
-            var ok = Text("Ok", root.transform, 12);
+            var ok = Text("Ok", root.transform, PBody);
             ok.fontStyle = FontStyles.Bold;
             ok.color = U.Hex(0x2e9e57);
-            var buy = SmallBtn("", root.transform, 12, U.Hex(0x1e5aa8), Color.white);
+            var buy = SmallBtn("", root.transform, PBody, U.Hex(0x1e5aa8), Color.white);
             buy.name = "Buy";
             buy.gameObject.AddComponent<CanvasGroup>();
             var hb = buy.gameObject.AddComponent<HorizontalLayoutGroup>();
-            hb.padding = new RectOffset(10, 10, 4, 4);
+            hb.padding = new RectOffset(16, 16, 14, 14);
             hb.childControlWidth = hb.childControlHeight = true;
             hb.childForceExpandWidth = hb.childForceExpandHeight = false;
             return root.gameObject;
@@ -543,11 +683,11 @@ namespace APC.EditorTools
             b.transition = Selectable.Transition.None;
             b.enabled = false;
             var h = root.gameObject.AddComponent<HorizontalLayoutGroup>();
-            h.padding = new RectOffset(7, 7, 3, 3);
+            h.padding = new RectOffset(10, 10, 5, 5);
             h.childControlWidth = h.childControlHeight = true;
             h.childForceExpandWidth = h.childForceExpandHeight = false;
             Fit(root.gameObject);
-            var t = Text("Text", rt, 12);
+            var t = Text("Text", rt, 17);
             t.alignment = TextAlignmentOptions.Center;
             t.color = Color.white;
             return root.gameObject;
@@ -568,7 +708,7 @@ namespace APC.EditorTools
 
         static Button MenuBtn(string label, Transform parent)
         {
-            var b = SmallBtn(label, parent, 14, PANEL, INK);
+            var b = SmallBtn(label, parent, 40, PANEL, INK);
             b.name = label;
             var h = b.gameObject.AddComponent<HorizontalLayoutGroup>();
             h.padding = new RectOffset(14, 14, 8, 8);
@@ -591,6 +731,14 @@ namespace APC.EditorTools
         {
             var f = go.AddComponent<ContentSizeFitter>();
             f.horizontalFit = f.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        }
+
+        // 화면 가운데 패널 (시설·업그레이드·알바·디버그 공통). 기준 720×1280에서 위 시계·주문서와 아래 메뉴를 피하는 크기
+        static void Center(RectTransform rt)
+        {
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(0, -10);
+            rt.sizeDelta = new Vector2(660, 860);
         }
 
         // 화면 모서리 기준 배치 (corner = 기준 모서리이자 기준점)
@@ -616,127 +764,145 @@ namespace APC.EditorTools
 
             var overlay = Img("Overlay", root, new Color(15 / 255f, 22 / 255f, 32 / 255f, .55f));
             Stretch(overlay.rectTransform);
-            var panel = Img("Panel", overlay.transform, Color.white);
-            panel.rectTransform.sizeDelta = new Vector2(1180, 720);
+            // 세로 화면 기준. 레이아웃 그룹 없이 앵커로만 배치해서 씬에서 바로 옮길 수 있다
+            var safe = Rect("Safe", overlay.transform);
+            Stretch(safe);
+            safe.gameObject.AddComponent<SafeArea>();
+            var panel = Img("Panel", safe, Color.white);
+            Stretch(panel.rectTransform);
+            panel.rectTransform.offsetMin = new Vector2(12, 12);
+            panel.rectTransform.offsetMax = new Vector2(-12, -12);
 
             // 위: 제목 · 적재율 · 예상 대금
             var top = Img("Top", panel.transform, BAR).rectTransform;
-            Band(top, true, 56);
-            var h = top.gameObject.AddComponent<HorizontalLayoutGroup>();
-            h.padding = new RectOffset(18, 18, 0, 0);
-            h.spacing = 18;
-            h.childAlignment = TextAnchor.MiddleLeft;
-            h.childControlWidth = true; h.childControlHeight = false;
-            h.childForceExpandWidth = false; h.childForceExpandHeight = false;
-            var title = Text("Title", top, 16);
-            var rate = Text("Rate", top, 15);
+            Band(top, true, 144);
+            var title = Text("Title", top, 21);
+            Corner(title.rectTransform, new Vector2(0, 1), new Vector2(18, -10));
+            title.rectTransform.sizeDelta = new Vector2(640, 36);
+            var rate = Text("Rate", top, 20);
+            Corner(rate.rectTransform, new Vector2(0, 1), new Vector2(18, -52));
+            rate.rectTransform.sizeDelta = new Vector2(270, 36);
             var bar = Img("Bar", top, new Color(0, 0, 0, .18f));
-            Layout(bar.gameObject, 120, 9);
+            Corner(bar.rectTransform, new Vector2(0, 1), new Vector2(294, -65));
+            bar.rectTransform.sizeDelta = new Vector2(130, 10);
             var fill = Img("Fill", bar.transform, U.Hex(0x4caf50));
             Stretch(fill.rectTransform);
             fill.rectTransform.anchorMax = new Vector2(0, 1);
-            var rateNote = Text("RateNote", top, 12);
-            Layout(Rect("Spacer", top).gameObject, 0, 0).flexibleWidth = 1;
-            var pay = Text("Pay", top, 15);
+            var rateNote = Text("RateNote", top, 17);
+            Corner(rateNote.rectTransform, new Vector2(0, 1), new Vector2(436, -52));
+            rateNote.rectTransform.sizeDelta = new Vector2(240, 36);
+            var pay = Text("Pay", top, 20);
+            Corner(pay.rectTransform, new Vector2(0, 1), new Vector2(18, -94));
+            pay.rectTransform.sizeDelta = new Vector2(640, 44);
 
-            // 아래: 버튼 · 도움말
+            // 아래 가운데: 출발 · 초기화 · 닫기
             var bottom = Img("Bottom", panel.transform, BAR).rectTransform;
-            Band(bottom, false, 56);
-            var hb = bottom.gameObject.AddComponent<HorizontalLayoutGroup>();
-            hb.padding = new RectOffset(18, 18, 0, 0);
-            hb.spacing = 8;
-            hb.childAlignment = TextAnchor.MiddleLeft;
-            hb.childControlWidth = true; hb.childControlHeight = false;
-            hb.childForceExpandWidth = false; hb.childForceExpandHeight = false;
-            var depart = Btn("Depart", bottom, "🚚 출발", true);
-            var reset = Btn("Reset", bottom, "↺ 초기화", false);
-            var close = Btn("Close", bottom, "✕ 닫기", false);
-            Layout(Rect("Spacer", bottom).gameObject, 0, 0).flexibleWidth = 1;
-            var help = Text("Help", bottom, 12);
-            help.color = SOFT;
-            help.text = "드래그: 배치 · 드래그 중 <b>R</b> 또는 <b>우클릭</b>: 회전 · 좌클릭 드래그: 이동 · 우클릭: 회수 · ⏸ 게임 시간 정지 중";
+            Band(bottom, false, 96);
+            Button BottomBtn(string n, string label, bool primary, float x)
+            {
+                var b = Btn(n, bottom, label, primary);
+                var rt = (RectTransform)b.transform;
+                rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(x, 0);
+                rt.sizeDelta = new Vector2(150, 64);
+                return b;
+            }
+            var depart = BottomBtn("Depart", "🚚 출발", true, -162);
+            var reset = BottomBtn("Reset", "↺ 초기화", false, 0);
+            var close = BottomBtn("Close", "✕ 닫기", false, 162);
 
-            // 가운데 본문
+            // 가운데 본문 (위→아래): 짐칸(GridArea, 가로 꽉 차게) / 출고 대기 박스(가로 목록) / 회전 버튼
             var body = Rect("Body", panel.transform);
             Stretch(body);
-            body.offsetMin = new Vector2(18, 56 + 14);
-            body.offsetMax = new Vector2(-18, -56 - 14);
+            body.offsetMin = new Vector2(18, 96 + 14);
+            body.offsetMax = new Vector2(-18, -144 - 14);
+            const float RotH = 64, WaitH = 140, Gap = 12;
 
-            var leftCol = Rect("Left", body);
-            Column(leftCol, 0, 290, true);
-            var left = Text("Info", leftCol, 13);
-            Stretch(left.rectTransform);
-            left.alignment = TextAlignmentOptions.TopLeft;
-            left.textWrappingMode = TextWrappingModes.Normal;
-            left.lineSpacing = 8;
-
-            var rightCol = Rect("Right", body);
-            Column(rightCol, 0, 270, false);
-            var listHeader = Text("Header", rightCol, 13);
+            var waitArea = Rect("Waiting", body);
+            waitArea.anchorMin = new Vector2(0, 0); waitArea.anchorMax = new Vector2(1, 0); waitArea.pivot = new Vector2(0.5f, 0);
+            waitArea.anchoredPosition = new Vector2(0, RotH + Gap);
+            waitArea.sizeDelta = new Vector2(0, WaitH);
+            var listHeader = Text("Header", waitArea, 18);
             listHeader.rectTransform.anchorMin = new Vector2(0, 1);
             listHeader.rectTransform.anchorMax = new Vector2(1, 1);
             listHeader.rectTransform.pivot = new Vector2(0, 1);
-            listHeader.rectTransform.sizeDelta = new Vector2(0, 24);
-            var viewport = Rect("Viewport", rightCol);
+            listHeader.rectTransform.sizeDelta = new Vector2(0, 26);
+            var viewport = Rect("Viewport", waitArea);
             Stretch(viewport);
-            viewport.offsetMax = new Vector2(0, -28);
+            viewport.offsetMax = new Vector2(0, -30);
             viewport.gameObject.AddComponent<RectMask2D>();
             viewport.gameObject.AddComponent<Image>().color = Color.clear;   // 스크롤 휠 받기
             var list = Rect("List", viewport);
-            list.anchorMin = new Vector2(0, 1); list.anchorMax = new Vector2(1, 1); list.pivot = new Vector2(0.5f, 1);
+            list.anchorMin = new Vector2(0, 0); list.anchorMax = new Vector2(0, 1); list.pivot = new Vector2(0, 0.5f);
             list.sizeDelta = Vector2.zero;
-            var v = list.gameObject.AddComponent<VerticalLayoutGroup>();
-            v.spacing = 6;
-            v.padding = new RectOffset(0, 4, 0, 0);
-            v.childControlWidth = true; v.childControlHeight = true;
-            v.childForceExpandWidth = true; v.childForceExpandHeight = false;
-            list.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var scroll = rightCol.gameObject.AddComponent<ScrollRect>();
+            var h = list.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.spacing = 6;
+            h.childControlWidth = true; h.childControlHeight = true;
+            h.childForceExpandWidth = false; h.childForceExpandHeight = true;
+            list.gameObject.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var scroll = waitArea.gameObject.AddComponent<ScrollRect>();
             scroll.viewport = viewport; scroll.content = list;
-            scroll.horizontal = false;
+            scroll.vertical = false;
             scroll.movementType = ScrollRect.MovementType.Clamped;
             scroll.scrollSensitivity = 30;
-            var empty = Text("EmptyHint", viewport, 11);
+            var empty = Text("EmptyHint", viewport, 16);
             Stretch(empty.rectTransform);
             empty.alignment = TextAlignmentOptions.TopLeft;
             empty.textWrappingMode = TextWrappingModes.Normal;
             empty.color = SOFT;
             empty.text = "출고 대기 박스가 없습니다.\n포장된 박스를 이 도크로 옮겨오세요.";
 
-            var center = Rect("Center", body);
-            Stretch(center);
-            center.offsetMin = new Vector2(290 + 14, 0);
-            center.offsetMax = new Vector2(-(270 + 14), 0);
-            var vc = center.gameObject.AddComponent<VerticalLayoutGroup>();
-            vc.spacing = 4;
-            vc.childAlignment = TextAnchor.MiddleCenter;
-            vc.childControlWidth = false; vc.childControlHeight = false;
-            vc.childForceExpandWidth = false; vc.childForceExpandHeight = false;
-            var cab = Img("Cab", center, U.Hex(0xeceff1));
-            cab.rectTransform.sizeDelta = new Vector2(110, 22);
-            var cabText = Text("Label", cab.transform, 12);
+            var rotL = Btn("RotateLeft", body, "↺ 왼쪽 회전", false);
+            var rotR = Btn("RotateRight", body, "오른쪽 회전 ↻", false);
+            foreach (var (b, x) in new[] { (rotL, -84f), (rotR, 84f) })
+            {
+                var rt = (RectTransform)b.transform;
+                rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0);
+                rt.anchoredPosition = new Vector2(x, 0);
+                rt.sizeDelta = new Vector2(160, RotH);
+            }
+
+            // 짐칸 크기(칸 크기 포함)는 트럭마다 LoadingView가 GridArea에 맞춘다. 운전석·문은 짐칸 테두리에 붙어서 따라간다
+            var gridArea = Rect("GridArea", body);
+            Stretch(gridArea);
+            gridArea.offsetMin = new Vector2(0, RotH + Gap + WaitH + Gap);
+            var frame = Img("GridFrame", gridArea, U.Hex(0x90a4ae));
+            Corner(frame.rectTransform, new Vector2(0.5f, 1), new Vector2(0, -34));
+            frame.rectTransform.sizeDelta = new Vector2(5 * LdCS + 6, 4 * LdCS + 6);
+            var cab = Img("Cab", frame.transform, U.Hex(0xeceff1));
+            cab.rectTransform.anchorMin = cab.rectTransform.anchorMax = new Vector2(0.5f, 1);
+            cab.rectTransform.pivot = new Vector2(0.5f, 0);
+            cab.rectTransform.anchoredPosition = new Vector2(0, 4);
+            cab.rectTransform.sizeDelta = new Vector2(140, 30);
+            var cabText = Text("Label", cab.transform, 17);
             Stretch(cabText.rectTransform);
             cabText.alignment = TextAlignmentOptions.Center;
             cabText.color = SOFT;
             cabText.text = "🚚 운전석";
-            var frame = Img("GridFrame", center, U.Hex(0x90a4ae));
-            frame.rectTransform.sizeDelta = new Vector2(5 * 56 + 6, 4 * 56 + 6);
             var grid = Img("Grid", frame.transform, U.Hex(0xeceff1)).rectTransform;
             grid.anchorMin = grid.anchorMax = grid.pivot = new Vector2(0, 1);
             grid.anchoredPosition = new Vector2(3, -3);
-            grid.sizeDelta = new Vector2(5 * 56, 4 * 56);
+            grid.sizeDelta = new Vector2(5 * LdCS, 4 * LdCS);
             RectTransform Layer(string n) { var r = Rect(n, grid); Stretch(r); return r; }
             var cells = Layer("Cells");
             var pieces = Layer("Pieces");
             var preview = Layer("Preview");
-            var door = Text("Door", center, 12);
-            door.rectTransform.sizeDelta = new Vector2(110, 20);
+            RectTransform Below(RectTransform rt, float x, float y)
+            {
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0);
+                rt.pivot = new Vector2(0.5f, 1);
+                rt.anchoredPosition = new Vector2(x, y);
+                return rt;
+            }
+            var door = Text("Door", frame.transform, 17);
+            Below(door.rectTransform, 0, -4).sizeDelta = new Vector2(140, 26);
             door.alignment = TextAlignmentOptions.Center;
             door.color = SOFT;
             door.text = "⬇ 짐칸 문";
 
             // 드래그 중인 박스 (마우스를 따라다님)
-            var ghost = Rect("Ghost", overlay.transform);
+            // 끌기 블록은 패널 안에 둬야 패널과 같은 비율로 줄어든다 (마지막 자식이라 맨 위에 그려진다)
+            var ghost = Rect("Ghost", panel.transform);
             ghost.anchorMin = ghost.anchorMax = new Vector2(0.5f, 0.5f);
             ghost.pivot = new Vector2(0, 1);
             var cg = ghost.gameObject.AddComponent<CanvasGroup>();
@@ -745,11 +911,12 @@ namespace APC.EditorTools
             var so = new SerializedObject(view);
             void S(string n, Object o) => so.FindProperty(n).objectReferenceValue = o;
             S("overlay", overlay.gameObject);
-            S("title", title); S("rate", rate); S("rateNote", rateNote); S("pay", pay); S("left", left);
+            S("title", title); S("rate", rate); S("rateNote", rateNote); S("pay", pay);
             S("listHeader", listHeader); S("emptyHint", empty); S("barFill", fill);
             S("gridFrame", frame.rectTransform); S("grid", grid); S("cellsRoot", cells); S("piecesRoot", pieces); S("previewRoot", preview);
             S("list", list); S("listViewport", viewport); S("ghost", ghost);
             S("departBtn", depart); S("resetBtn", reset); S("closeBtn", close);
+            S("rotateLeftBtn", rotL); S("rotateRightBtn", rotR);
             S("cellPrefab", cell); S("piecePrefab", piece); S("miniPrefab", mini); S("cardPrefab", card);
             so.ApplyModifiedPropertiesWithoutUndo();
             overlay.gameObject.SetActive(false);
@@ -764,7 +931,7 @@ namespace APC.EditorTools
             Stretch(fill.rectTransform);
             fill.rectTransform.offsetMin = Vector2.one;
             fill.rectTransform.offsetMax = -Vector2.one;
-            var label = Text("Label", root.transform, 18);
+            var label = Text("Label", root.transform, 23);
             Stretch(label.rectTransform);
             label.alignment = TextAlignmentOptions.Center;
             return root.gameObject;
@@ -786,16 +953,16 @@ namespace APC.EditorTools
             Edge("Right", new Vector2(1, 0), Vector2.one, new Vector2(3, 0));
             Edge("Bottom", Vector2.zero, new Vector2(1, 0), new Vector2(0, 3));
             Edge("Left", Vector2.zero, new Vector2(0, 1), new Vector2(3, 0));
-            var label = Text("Label", root.transform, 15);
+            var label = Text("Label", root.transform, 20);
             label.rectTransform.anchorMin = label.rectTransform.anchorMax = label.rectTransform.pivot = new Vector2(0, 1);
             label.rectTransform.anchoredPosition = new Vector2(3, -2);
-            label.rectTransform.sizeDelta = new Vector2(50, 20);
+            label.rectTransform.sizeDelta = new Vector2(60, 26);
             label.alignment = TextAlignmentOptions.TopLeft;
             var over = Img("Over", root.transform, new Color(0, 0, 0, .55f)).rectTransform;
             over.anchorMin = over.anchorMax = over.pivot = new Vector2(1, 0);
             over.anchoredPosition = new Vector2(-3, 2);
-            over.sizeDelta = new Vector2(24, 15);
-            var ot = Text("Text", over, 11);
+            over.sizeDelta = new Vector2(34, 22);
+            var ot = Text("Text", over, 16);
             Stretch(ot.rectTransform);
             ot.alignment = TextAlignmentOptions.Center;
             ot.fontStyle = FontStyles.Bold;
@@ -810,20 +977,19 @@ namespace APC.EditorTools
             return i.gameObject;
         }
 
-        // 대기 박스 카드: Shape(작은 블록) / Info(번호·아이콘·품목·금액)
+        // 대기 박스 카드 (가로 목록): 위 Shape(작은 블록) / 아래 Info(번호·아이콘·금액). 폭·Info 위 여백은 LoadingView가 모양에 맞춘다
         static GameObject CardPrefab()
         {
             var root = Img("LdCard", null, U.Hex(0xfafbfc));
-            root.gameObject.AddComponent<LayoutElement>().preferredHeight = 62;
+            root.gameObject.AddComponent<LayoutElement>().preferredWidth = 110;
             var shape = Rect("Shape", root.transform);
-            shape.anchorMin = shape.anchorMax = new Vector2(0, 0.5f);
-            shape.pivot = new Vector2(0, 0.5f);
-            shape.anchoredPosition = new Vector2(8, 0);
-            var info = Text("Info", root.transform, 13);
+            shape.anchorMin = shape.anchorMax = shape.pivot = new Vector2(0.5f, 1);
+            shape.anchoredPosition = new Vector2(0, -8);
+            var info = Text("Info", root.transform, 16);
             Stretch(info.rectTransform);
-            info.rectTransform.offsetMin = new Vector2(40, 6);
-            info.rectTransform.offsetMax = new Vector2(-8, -6);
-            info.alignment = TextAlignmentOptions.Left;
+            info.rectTransform.offsetMin = new Vector2(4, 4);
+            info.rectTransform.offsetMax = new Vector2(-4, -40);
+            info.alignment = TextAlignmentOptions.Top;
             info.textWrappingMode = TextWrappingModes.Normal;
             return root.gameObject;
         }
@@ -870,7 +1036,7 @@ namespace APC.EditorTools
             Layout(bg.gameObject, 0, 36);
             bg.rectTransform.sizeDelta = new Vector2(100, 36);
             var b = bg.gameObject.AddComponent<Button>();
-            var t = Text("Label", bg.transform, 14);
+            var t = Text("Label", bg.transform, 19);
             Stretch(t.rectTransform);
             t.margin = new Vector4(16, 0, 16, 0);
             t.alignment = TextAlignmentOptions.Center;
@@ -908,14 +1074,5 @@ namespace APC.EditorTools
             rt.anchoredPosition = Vector2.zero;
         }
 
-        // 본문 왼쪽/오른쪽 세로 칸
-        static void Column(RectTransform rt, float x, float width, bool leftSide)
-        {
-            rt.anchorMin = new Vector2(leftSide ? 0 : 1, 0);
-            rt.anchorMax = new Vector2(leftSide ? 0 : 1, 1);
-            rt.pivot = new Vector2(leftSide ? 0 : 1, 0.5f);
-            rt.sizeDelta = new Vector2(width, 0);
-            rt.anchoredPosition = new Vector2(x, 0);
-        }
     }
 }

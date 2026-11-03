@@ -220,6 +220,28 @@ namespace APC.Tests
         }
 
         [Test]
+        public void Loading_CannotDepartWithInvalidPlacement()
+        {
+            RunTruck();
+            var d = G.docks[0];
+            var b = Box(50, new[] { "food" }, new[] { 0, 0 });
+            d.waiting.Add(b);
+            var b2 = Box(30, new[] { "daily" }, new[] { 0, 0 });
+            d.waiting.Add(b2);
+            G.loadCompress = 0;
+            Loading.Open(d);
+            Loading.Place(b, new List<Vector2Int> { new Vector2Int(-1, 0) }, null);   // 짐칸 밖에는 놓이지 않는다
+            Assert.IsEmpty(d.truck.placements);
+            Assert.AreEqual(2, d.waiting.Count);
+            Loading.Place(b, C(0, 0), null);
+            Loading.Place(b2, C(0, 0), null);   // 겹치기는 한도를 넘어도 일단 놓인다
+            Assert.AreEqual(2, LoadLogic.Invalid(d.truck).Count);
+            Loading.Depart();
+            Assert.AreSame(d, Loading.dock);
+            Assert.AreEqual(TruckState.Present, d.truck.state);
+        }
+
+        [Test]
         public void Loading_CannotOpenWithoutTruck()
         {
             var toasts = new List<string>();
@@ -245,6 +267,7 @@ namespace APC.Tests
             Sim.Start();
             for (int i = 0; i < 60 && G.docks[0].truck?.state != TruckState.Present; i++) Sim.Update(Sim.STEP);
             Assert.AreEqual(TruckState.Present, G.docks[0].truck.state);
+            G.docks[0].truck.locked.Clear();   // 랜덤 잠긴 칸에 걸리면 Place가 거부한다
         }
     }
 }
