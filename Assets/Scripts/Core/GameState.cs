@@ -132,6 +132,7 @@ namespace APC
         public double x, z, facing;
         public bool moving;
         public List<HandEntry> hand = new List<HandEntry>();
+        public string costumeId = "basic"; // CostumeCatalog의 코스튬 ID (외형만, 게임 규칙과 무관)
         public P Pos => new P(x, z);
     }
 
@@ -181,6 +182,8 @@ namespace APC
         public string status = "대기";
         public List<Step> plan = new List<Step>();
         public P? idleSpot;   // 할 일 없을 때 잡아 둔 대기 자리 (다른 알바와 겹치지 않게)
+
+        public Alba() { costumeId = "rabbit"; }
     }
 
     public class GameState

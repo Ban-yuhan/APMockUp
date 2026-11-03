@@ -20,6 +20,7 @@ namespace APC
             if (actor == null) return;
             transform.position = CoordUtil.ToWorld(actor.x, actor.z);
             transform.rotation = Quaternion.Euler(0, CoordUtil.FacingToYaw(actor.facing), 0);
+            SyncCostume();
             if (handAnchor) SyncHand();
             if (!animator) return;
             if (actor is Alba al) SyncRest(al.resting);
@@ -51,6 +52,35 @@ namespace APC
             else { m.localRotation = Quaternion.identity; m.localPosition = p0; }
             foreach (var r in m.GetComponentsInChildren<Renderer>())
                 if (resting) Palette.Tint(r, U.Hex(0xb0bec5)); else r.SetPropertyBlock(null);
+        }
+
+        // 코스튬: 처음엔 바로 입히고, 바뀌면 "펑" 연기 뒤 연기가 가장 클 때 모델을 바꾼다
+        string costume;
+        float swapAt = -1;
+
+        void SyncCostume()
+        {
+            if (actor.costumeId == costume) { swapAt = -1; return; }
+            if (costume == null) { ApplyCostume(); return; }
+            if (swapAt < 0)
+            {
+                Poof.Play(transform.position + Vector3.up * 0.7f);
+                swapAt = Time.unscaledTime + Poof.SwapDelay;
+            }
+            else if (Time.unscaledTime >= swapAt) ApplyCostume();
+        }
+
+        void ApplyCostume()
+        {
+            costume = actor.costumeId;
+            swapAt = -1;
+            var d = CostumeCatalog.Find(costume);
+            if (d == null || !d.walkModelPrefab) return; // 목록에 없으면 프리팹 모델 그대로
+            if (animator) Destroy(animator.gameObject);
+            animator = CostumeCatalog.Spawn(d, transform);
+            // 새 모델에 휴식 자세를 다시 적용
+            modelPos = null;
+            restShown = false;
         }
 
         // 손에 든 물건 (원본 setStack): HandAnchor 아래 슬롯을 아래부터 쌓는다

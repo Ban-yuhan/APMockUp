@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 619ceb9ae828d254ab7948613d019ae6, type: 3}
+  m_Name: CostumeCatalog
+  m_EditorClassIdentifier: APC.Runtime::APC.CostumeCatalog
+  costumes:
+  - costumeId: basic
+    displayName: "\uBCA0\uC774\uC9C1"
+    icon: {fileID: 0}
+    walkModelPrefab: {fileID: 919132149155446097, guid: 10486d70839b1724d848053e943e9565, type: 3}
+    carryModelPrefab: {fileID: 919132149155446097, guid: d54a323b15c5395459deea8769f3f9d4, type: 3}
+    controller: {fileID: 9100000, guid: 3e3500b057932604bb0ddb6742f0ab6c, type: 2}
+    footOffsetY: 0
+  - costumeId: rabbit
+    displayName: "\uD1A0\uB07C"
+    icon: {fileID: 0}
+    walkModelPrefab: {fileID: 919132149155446097, guid: 2b75650a49d7a7a4594f853378594b04, type: 3}
+    carryModelPrefab: {fileID: 919132149155446097, guid: 7238e8cd0d4cc49428c26ccbd697a8ef, type: 3}
+    controller: {fileID: 9100000, guid: 80a6f0d4be23aa94f99ce00baf98d820, type: 2}
+    footOffsetY: 3.32
+  - costumeId: macaron
+    displayName: "\uB9C8\uCE74\uB871"
+    icon: {fileID: 0}
+    walkModelPrefab: {fileID: 919132149155446097, guid: 1ac69284c3dce014694f6ec9d3518183, type: 3}
+    carryModelPrefab: {fileID: 919132149155446097, guid: c7ab300c10a3dc54e887adb416007bc3, type: 3}
+    controller: {fileID: 9100000, guid: 7a97e6a3e9bb20340bb0c036350d7e86, type: 2}
+    footOffsetY: 0

@@ -19,13 +19,15 @@ namespace APC
         // MT 글자 + 막대 (원본 UI.mtBar). panel = 패널(밝은 바탕)용 글자색, 아니면 라벨용
         public static string Mt(double mt, bool panel)
         {
-            var c = Game.CONFIG.mt;
-            double r = (mt - c.min) / (c.max - c.min);
-            int k = mt < -50 ? 0 : mt < 0 ? 1 : mt < 50 ? 2 : 3;
+            int k = MtLevel(mt);
             string[] text = panel ? new[] { "#d63031", "#e65100", "#b8860b", GOOD } : new[] { "#ff8a80", "#ffab91", "#ffe082", "#a5d6a7" };
-            string[] bar = { "#d63031", "#ff7f50", "#e6a100", GOOD };
-            return $"<size=90%><b><color={text[k]}>MT {U.Round(mt)}</color></b></size>{Bar(r, bar[k])}";
+            return $"<size=90%><b><color={text[k]}>MT {U.Round(mt)}</color></b></size>{Bar(MtRatio(mt), MtBar[k])}";
         }
+
+        // MT 구간 0 위험 ~ 3 안전, 막대 색, 설정 범위 대비 비율
+        public static int MtLevel(double mt) => mt < -50 ? 0 : mt < 0 ? 1 : mt < 50 ? 2 : 3;
+        public static readonly string[] MtBar = { "#d63031", "#ff7f50", "#e6a100", GOOD };
+        public static double MtRatio(double mt) { var c = Game.CONFIG.mt; return (mt - c.min) / (c.max - c.min); }
 
         // shortcut: 원본 막대(span.bar)를 글자 10개로 그린다. 진짜 막대가 필요하면 Image로 바꾼다
         public static string Bar(double ratio, string color = "#4caf50")

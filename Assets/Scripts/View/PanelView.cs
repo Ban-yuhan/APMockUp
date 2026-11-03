@@ -18,21 +18,12 @@ namespace APC
         [Tooltip("패널별 내용. 열린 패널만 켠다")]
         [SerializeField] RectTransform facility, upgrade, alba;
         [SerializeField] Button closeBtn;
-        [Header("알바 패널 제목·소제목·설명 글자 크기 (줄·버튼 글자는 프리팹)")]
-        [SerializeField] float titleSize = 34, headingSize = 28, bodySize = 24;
-        [Header("알바 패널 프리팹")]
-        [SerializeField] TMP_Text textPrefab;
-        [Tooltip("Label / Ok / Buy(버튼)")]
-        [SerializeField] RectTransform rowPrefab;
-        [Tooltip("Info / Bottom(Assign 드롭다운, Status, Fire 버튼)")]
-        [SerializeField] RectTransform albaRowPrefab;
+        [Header("개편된 알바 패널 뷰 (Hierarchy에 미리 배치된 오브젝트)")]
+        [SerializeField] AlbaPanelView albaView;
 
         string panelName, sig;
         float timer;
         DebugAction[] shopRows;
-        // 다시 그리지 않고 0.5초마다 바꾸는 알바 카드 글자 (원본 data-mt, data-status)
-        readonly System.Collections.Generic.List<(Alba a, RectTransform row, TMP_Text info, TMP_Text status)> albaRows =
-            new System.Collections.Generic.List<(Alba, RectTransform, TMP_Text, TMP_Text)>();
 
         public string PanelName => panelName;
 
@@ -40,13 +31,13 @@ namespace APC
         public Alba AlbaAtRow(Vector2 screen)
         {
             if (panelName != "alba") return null;
-            foreach (var r in albaRows)
-                if (r.row && RectTransformUtility.RectangleContainsScreenPoint(r.row, screen, null)) return r.a;
+            if (albaView != null) return albaView.AlbaAtRow(screen);
             return null;
         }
 
         void Awake()
         {
+            if (!albaView && alba) albaView = alba.GetComponent<AlbaPanelView>();
             closeBtn.onClick.AddListener(Close);
             shopRows = facility.GetComponentsInChildren<DebugAction>(true).Concat(upgrade.GetComponentsInChildren<DebugAction>(true)).ToArray();
             foreach (var r in shopRows)
@@ -104,20 +95,14 @@ namespace APC
                 foreach (var r in shopRows) if (r.transform.IsChildOf(scroll.content)) Fill(r);
                 return;
             }
-            string s = Signature();
-            // 드롭다운이 펼쳐져 있으면 다시 그리지 않는다 (원본: select에 포커스가 있으면 건너뜀)
-            bool open = alba.GetComponentsInChildren<TMP_Dropdown>().Any(d => d.IsExpanded);
-            if (force || (s != sig && !open))
+            if (albaView != null)
             {
-                sig = s;
-                albaRows.Clear();
-                for (int i = alba.childCount - 1; i >= 0; i--) { var go = alba.GetChild(i).gameObject; go.SetActive(false); Destroy(go); }
-                AlbaPanel();
-            }
-            foreach (var r in albaRows)
-            {
-                r.info.text = AlbaInfo(r.a);
-                r.status.text = $"{Face(r.a)} {r.a.status}";
+                string s = Signature();
+                if (force || s != sig)
+                {
+                    sig = s;
+                    albaView.RefreshAll();
+                }
             }
         }
 
@@ -187,17 +172,6 @@ namespace APC
             Show(r.transform, ok, $"{btn} {Rich.Money(cost)}", G.money >= cost);
         }
 
-        // ---------- 조각 ----------
-        void Text(string s, float size, bool heading)
-        {
-            var t = Instantiate(textPrefab, alba);
-            t.fontSize = size;
-            t.text = heading ? $"<b>{s}</b>" : s;
-            t.color = heading ? U.Hex(0x1f2933) : U.Hex(0x5b6775);
-            // 원본 h3 위 여백 16px
-            if (heading && size < titleSize) t.margin = new Vector4(0, 24, 0, 0);
-        }
-
         // ok가 있으면 초록 글자, 없으면 구매 버튼 (돈이 모자라면 흐리게, 누를 수 없음)
         static void Show(Transform row, string ok, string btn, bool enabled)
         {
@@ -211,65 +185,10 @@ namespace APC
             Enable(buy, enabled);
         }
 
-        void Row(string label, string ok, string btn, bool enabled, Action act)
-        {
-            var row = Instantiate(rowPrefab, alba);
-            row.Find("Label").GetComponent<TMP_Text>().text = label;
-            Show(row, ok, btn, enabled);
-            if (ok == null) row.Find("Buy").GetComponent<Button>().onClick.AddListener(() => { act(); Render(true); });
-        }
-
         static void Enable(Button b, bool on)
         {
             b.interactable = on;
             b.GetComponent<CanvasGroup>().alpha = on ? 1 : 0.4f;
         }
-
-        // ---------- 알바 패널 (원본 panel_alba) ----------
-        void AlbaPanel()
-        {
-            var c = CONFIG.alba;
-            Text("👷 아르바이트", titleSize, true);
-            Row("<b>지원자</b>", null, $"🔄 새로 받기 {Rich.Money(c.rerollCost)}", G.money >= c.rerollCost,
-                () => { if (S.Spend(c.rerollCost)) Albas.RerollCandidates(); });
-            Text($"낮/밤이 바뀔 때 지원자가 새로 옵니다. 낮/밤이 바뀔 때마다 시급 × {c.hoursPerPhase}시간을 지급합니다.", bodySize, false);
-            for (int i = 0; i < G.candidates.Count; i++)
-            {
-                var cd = G.candidates[i];
-                int idx = i;
-                Row($"<b>{cd.name}</b>  💪{cd.str} 🏃{cd.agi} 🧠{cd.intel}\n시급 {Rich.Money(cd.wage)} {Rich.Small("12시간 " + Rich.Money(Albas.ShiftPay(cd.wage)))}",
-                    null, "고용", G.albas.Count < c.max, () => Albas.Hire(idx));
-            }
-            if (G.candidates.Count == 0) Text("지원자가 없습니다", bodySize, false);
-
-            Text("공정 배치 현황", headingSize, true);
-            Text(string.Join("   ", CONFIG.stages.Select(s => $"{s.emoji}{s.name} {(S.IsAuto(s.id) ? "🤖" : $"{S.StageCount(s.id)}/{S.StageSlots(s.id)}")}")), bodySize, false);
-
-            Text($"직원 ({G.albas.Count}/{c.max})", headingSize, true);
-            if (G.albas.Count == 0) Text("고용한 알바가 없습니다. 위 지원자를 고용하세요.", bodySize, false);
-            foreach (var a in G.albas)
-            {
-                var row = Instantiate(albaRowPrefab, alba);
-                var dd = row.Find("Bottom/Assign").GetComponent<TMP_Dropdown>();
-                dd.ClearOptions();
-                var opts = new System.Collections.Generic.List<string> { "🪑 대기중" };
-                // shortcut: TMP 드롭다운은 항목 비활성화가 없어 가득 찬 공정도 고를 수 있다. 고르면 Assign이 "배치 슬롯이 부족합니다"로 막는다
-                opts.AddRange(CONFIG.stages.Select(s => $"{s.emoji} {s.name} ({(S.IsAuto(s.id) ? "자동화" : $"{S.StageCount(s.id)}/{S.StageSlots(s.id)}")})"));
-                dd.AddOptions(opts);
-                dd.SetValueWithoutNotify(a.stage == null ? 0 : CONFIG.stages.FindIndex(s => s.id == a.stage) + 1);
-                var hired = a;
-                dd.onValueChanged.AddListener(v => { Albas.Assign(hired, v == 0 ? null : CONFIG.stages[v - 1].id); Render(true); });
-                row.Find("Bottom/Fire").GetComponent<Button>().onClick.AddListener(() => { Albas.Fire(hired); Render(true); });
-                albaRows.Add((a, row, row.Find("Info").GetComponent<TMP_Text>(), row.Find("Bottom/Status").GetComponent<TMP_Text>()));
-            }
-            Text("간식을 직원 카드나 맵 위 알바에게 드래그하면 MT가 회복됩니다.", bodySize, false);
-        }
-
-        static string AlbaInfo(Alba a) =>
-            $"<b><size=115%>{a.name}</size></b>  💪{a.str} 🏃{a.agi} 🧠{a.intel}  시급 {Rich.Money(a.wage)} {Rich.Small($"(12시간 {Rich.Money(Albas.ShiftPay(a.wage))})")}" +
-            (a.unpaid ? " <b><color=#d63031>미지급</color></b>" : "") +
-            $"\n{Rich.Mt(a.mt, true)}\n<color={Rich.SOFT}>숙련도 들기 {Albas.SkillLv(a.skLift)} · 나르기 {Albas.SkillLv(a.skCarry)} · 포장 {Albas.SkillLv(a.skPack)} · 검수 {Albas.SkillLv(a.skInspect)}</color> {Rich.Small($"(최대 {Albas.Capacity(a)}개)")}";
-
-        static string Face(Alba a) => Rich.Face(a);
     }
 }

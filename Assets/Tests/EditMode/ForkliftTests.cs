@@ -168,6 +168,29 @@ namespace APC.Tests
             Assert.AreEqual(-side * 60 * Mathf.Deg2Rad * 0.5, f.heading, 1e-6);
         }
 
+        // 대각선이라도 좌우가 앞뒤보다 크면 제자리 회전
+        [Test]
+        public void Pivot_WhenSideDominates()
+        {
+            fl.ridden = true;
+            var w0 = Forklifts.Wheel(fl, 1);
+            Run(new P(1, 0.5), 10);
+            var w1 = Forklifts.Wheel(fl, 1);
+            Assert.AreEqual(0, fl.speed);
+            Assert.AreEqual(w0.x, w1.x, 1e-9);
+            Assert.AreEqual(w0.z, w1.z, 1e-9);
+            Assert.Less(fl.heading, 0);
+        }
+
+        // 출발 직후(거의 0 속도)에도 최고 속도의 40% 비율로는 돈다
+        [Test]
+        public void Turn_AtLowSpeedStillTurns()
+        {
+            fl.ridden = true;
+            Run(new P(0.3, 1), 1);
+            Assert.AreEqual(-0.3 * 90 * Mathf.Deg2Rad * 0.4 * Sim.STEP, fl.heading, 1e-9);
+        }
+
         [Test]
         public void AlbaGoesAroundForklift()
         {

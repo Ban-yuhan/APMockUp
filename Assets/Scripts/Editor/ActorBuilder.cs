@@ -34,7 +34,7 @@ namespace APC.EditorTools
         }
 
         // ---------- 애니메이션 ----------
-        static AnimatorController Controller(string name, string walkFbx, string carryFbx)
+        public static AnimatorController Controller(string name, string walkFbx, string carryFbx)
         {
             var walk = LoopClip(walkFbx, "Walk");
             var carry = LoopClip(carryFbx, "CarryWalk");
@@ -69,7 +69,7 @@ namespace APC.EditorTools
         // FBX의 클립 하나를 이름을 바꾸고 반복으로
         static AnimationClip LoopClip(string fbx, string clipName)
         {
-            string path = CharDir + fbx + ".fbx";
+            string path = FbxPath(fbx);
             var imp = (ModelImporter)AssetImporter.GetAtPath(path);
             var clips = imp.clipAnimations.Length > 0 ? imp.clipAnimations : imp.defaultClipAnimations;
             if (clips[0].name != clipName || !clips[0].loopTime)
@@ -81,6 +81,12 @@ namespace APC.EditorTools
             }
             return AssetDatabase.LoadAllAssetsAtPath(path).OfType<AnimationClip>().First(c => c.name == clipName);
         }
+
+        // 캐릭터 폴더(하위 폴더 포함)에서 이름이 같은 FBX
+        public static string FbxPath(string fbx) =>
+            AssetDatabase.FindAssets(fbx + " t:Model", new[] { CharDir.TrimEnd('/') })
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .First(p => System.IO.Path.GetFileNameWithoutExtension(p) == fbx);
 
         // 한 프레임을 그대로 유지하는 자세 클립
         static AnimationClip Pose(AnimationClip src, string path)
@@ -105,7 +111,7 @@ namespace APC.EditorTools
             var root = new GameObject(name);
             var view = root.AddComponent<CharacterView>();
             view.isPlayer = isPlayer;
-            var model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(CharDir + fbx + ".fbx"));
+            var model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(FbxPath(fbx)));
             model.name = "Model";
             model.transform.SetParent(root.transform, false);
             model.transform.localPosition = new Vector3(0, footY, 0);

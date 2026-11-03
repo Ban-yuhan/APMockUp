@@ -11,6 +11,7 @@ namespace APC
     {
         public const double BOARD_RANGE = 1.0;   // 차체 가장자리에서 이만큼 안이면 탑승 가능
         const double ACTOR_R = 0.3;              // 알바 몸 반지름 (차체를 이만큼 넓혀서 막는다)
+        const double MIN_TURN = 0.4;             // 저속에서도 이 비율(최고 속도 기준)만큼은 돈다
 
         public static Forklift Ridden() => G.forklifts.Find(f => f.shown && f.ridden);
         public static bool Riding => Ridden() != null;
@@ -110,7 +111,8 @@ namespace APC
         static void Drive(Forklift f, double dt, double h, double v)
         {
             double px = f.x, pz = f.z, ph = f.heading;
-            bool pivot = Math.Abs(v) < 0.15 && Math.Abs(h) > 0.1;
+            // 좌우 입력이 앞뒤보다 크면 (수평 ±45° 안) 제자리 회전
+            bool pivot = Math.Abs(h) > 0.1 && Math.Abs(h) > Math.Abs(v) * 1.5;
             double target = pivot ? 0 : v >= 0 ? v * f.maxSpeed : v * f.reverseSpeed;
             bool speedUp = target * f.speed >= 0 && Math.Abs(target) > Math.Abs(f.speed);
             double dv = (speedUp ? f.accel : f.brake) * dt;
@@ -124,11 +126,12 @@ namespace APC
             }
             else if (f.speed != 0)
             {
-                // 앞차축 중심은 곧게 나아가고 차체가 그 점을 기준으로 돈다. 회전량은 속도에 비례 (회전 반경 일정), 후진이면 반대로 돈다
+                // 앞차축 중심은 곧게 나아가고 차체가 그 점을 기준으로 돈다. 회전량은 속도에 비례하되 저속에서도 MIN_TURN만큼은 돈다, 후진이면 반대로 돈다
                 var (fx, fz) = Fwd(f.heading);
                 f.x += fx * f.speed * dt;
                 f.z += fz * f.speed * dt;
-                Rotate(f, Axle(f), -h * f.turnRate * Math.PI / 180 * (f.speed / f.maxSpeed) * dt);
+                double turn = Math.Sign(f.speed) * Math.Max(MIN_TURN, Math.Abs(f.speed) / f.maxSpeed);
+                Rotate(f, Axle(f), -h * f.turnRate * Math.PI / 180 * turn * dt);
             }
 
             // 창고 벽에 차체 모서리가 닿으면 그 스텝은 취소하고 멈춘다
